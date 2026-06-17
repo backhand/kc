@@ -1,0 +1,618 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Node",
+            "metadata": {
+                "annotations": {
+                    "alpha.kubernetes.io/provided-node-ip": "10.0.1.40",
+                    "flannel.alpha.coreos.com/backend-data": "{\"VNI\":1,\"VtepMAC\":\"2e:c0:8b:e4:7e:1e\"}",
+                    "flannel.alpha.coreos.com/backend-type": "vxlan",
+                    "flannel.alpha.coreos.com/kube-subnet-manager": "true",
+                    "flannel.alpha.coreos.com/public-ip": "10.0.1.40",
+                    "k3s.io/hostname": "thinkpilot-k3s-agent-0",
+                    "k3s.io/internal-ip": "10.0.1.40",
+                    "k3s.io/node-args": "[\"agent\",\"--node-ip\",\"10.0.1.40\",\"--flannel-iface\",\"enp7s0\"]",
+                    "k3s.io/node-config-hash": "OQAZRGHWNGPZKL6XQ3YBZYFUJN7CEIDBBOGOV2TVKDZ4AMO4GGOA====",
+                    "k3s.io/node-env": "{\"K3S_TOKEN\":\"********\",\"K3S_URL\":\"https://10.0.1.30:6443\"}",
+                    "node.alpha.kubernetes.io/ttl": "0",
+                    "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+                },
+                "creationTimestamp": "2026-06-14T19:43:53Z",
+                "finalizers": [
+                    "wrangler.cattle.io/node",
+                    "wrangler.cattle.io/managed-etcd-controller"
+                ],
+                "labels": {
+                    "beta.kubernetes.io/arch": "amd64",
+                    "beta.kubernetes.io/instance-type": "k3s",
+                    "beta.kubernetes.io/os": "linux",
+                    "kubernetes.io/arch": "amd64",
+                    "kubernetes.io/hostname": "thinkpilot-k3s-agent-0",
+                    "kubernetes.io/os": "linux",
+                    "node.kubernetes.io/instance-type": "k3s"
+                },
+                "name": "thinkpilot-k3s-agent-0",
+                "resourceVersion": "769353",
+                "uid": "cd189a47-cfeb-420c-98e9-4a0acb19ea8d"
+            },
+            "spec": {
+                "podCIDR": "10.42.1.0/24",
+                "podCIDRs": [
+                    "10.42.1.0/24"
+                ],
+                "providerID": "k3s://thinkpilot-k3s-agent-0"
+            },
+            "status": {
+                "addresses": [
+                    {
+                        "address": "10.0.1.40",
+                        "type": "InternalIP"
+                    },
+                    {
+                        "address": "thinkpilot-k3s-agent-0",
+                        "type": "Hostname"
+                    }
+                ],
+                "allocatable": {
+                    "cpu": "4",
+                    "ephemeral-storage": "152891111919",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "7931600Ki",
+                    "pods": "110"
+                },
+                "capacity": {
+                    "cpu": "4",
+                    "ephemeral-storage": "157166028Ki",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "7931600Ki",
+                    "pods": "110"
+                },
+                "conditions": [
+                    {
+                        "lastHeartbeatTime": "2026-06-17T14:57:27Z",
+                        "lastTransitionTime": "2026-06-14T19:43:53Z",
+                        "message": "kubelet has sufficient memory available",
+                        "reason": "KubeletHasSufficientMemory",
+                        "status": "False",
+                        "type": "MemoryPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-06-17T14:57:27Z",
+                        "lastTransitionTime": "2026-06-14T19:43:53Z",
+                        "message": "kubelet has no disk pressure",
+                        "reason": "KubeletHasNoDiskPressure",
+                        "status": "False",
+                        "type": "DiskPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-06-17T14:57:27Z",
+                        "lastTransitionTime": "2026-06-14T19:43:53Z",
+                        "message": "kubelet has sufficient PID available",
+                        "reason": "KubeletHasSufficientPID",
+                        "status": "False",
+                        "type": "PIDPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-06-17T14:57:27Z",
+                        "lastTransitionTime": "2026-06-14T19:43:53Z",
+                        "message": "kubelet is posting ready status",
+                        "reason": "KubeletReady",
+                        "status": "True",
+                        "type": "Ready"
+                    }
+                ],
+                "daemonEndpoints": {
+                    "kubeletEndpoint": {
+                        "Port": 10250
+                    }
+                },
+                "features": {
+                    "supplementalGroupsPolicy": true
+                },
+                "images": [
+                    {
+                        "names": [
+                            "docker.io/myoung34/github-runner@sha256:71231f16be5226f91c40d970c49d7e11588aba345eee6ea95ab9dc8e47d0a3d9",
+                            "docker.io/myoung34/github-runner:2.335.1"
+                        ],
+                        "sizeBytes": 847829100
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/thinkpilot/mailon@sha256:c13fa5f379518147020c6e7e8572b6237f2f825569db6838914c9bbf00ba7d94"
+                        ],
+                        "sizeBytes": 795916968
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/thinkpilot/mailon@sha256:e65d9f78a8c22a258c458638ed0fe79d94617cede7f7fbab9bfa402dd85e6a67"
+                        ],
+                        "sizeBytes": 751226879
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/thinkpilot/consistant@sha256:16651cbf7711a3142b5eadce8fa08eb1b5291cec819cccc2921317f19947be81",
+                            "ghcr.io/thinkpilot/consistant:9327f3f"
+                        ],
+                        "sizeBytes": 619976917
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/thinkpilot/consistant@sha256:c54acf6a01e5d98f69debd2064e1fd2555fa08743e01588a50905bede2428331",
+                            "ghcr.io/thinkpilot/consistant:9624dd2"
+                        ],
+                        "sizeBytes": 619883243
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/thinkpilot/consistant@sha256:28a6e432a53468abcb9ffb1792e42761727289b277795a7537401d6ee31b851a",
+                            "ghcr.io/thinkpilot/consistant:88ee165"
+                        ],
+                        "sizeBytes": 619871425
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/thinkpilot/mailon@sha256:9427f104392412706cebdde386a93a4e427206ee14ebc05b2c6f29a73659459e",
+                            "ghcr.io/thinkpilot/mailon:v0.6.5"
+                        ],
+                        "sizeBytes": 545103894
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/thinkpilot/mailon@sha256:e9337465c7402c876ae2e50c1c6cababdfeda2f8a189a7a4cae9d347d402b218",
+                            "ghcr.io/thinkpilot/mailon:0.6.4",
+                            "ghcr.io/thinkpilot/mailon:latest",
+                            "ghcr.io/thinkpilot/mailon:v0.6.4"
+                        ],
+                        "sizeBytes": 545102162
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/thinkpilot/mailon@sha256:7208f5a680bee246bd2c8e1699a8e365210da62312301c6a64593411af7486c4",
+                            "ghcr.io/thinkpilot/mailon:v0.6.6"
+                        ],
+                        "sizeBytes": 545101012
+                    },
+                    {
+                        "names": [
+                            "docker.io/temporalio/admin-tools@sha256:951f64e4be3dd5d7c31d501f5c2268eca38f850e9f17ad89f0f35de41d3ba8f1",
+                            "docker.io/temporalio/admin-tools:1.29.6.1-tctl-1.18.4-cli-1.7.0"
+                        ],
+                        "sizeBytes": 315739942
+                    },
+                    {
+                        "names": [
+                            "docker.io/temporalio/server@sha256:0ea00ad37b602a9fd6d6fc0dba18c7570bd52eb898e7aae6fba260acfa79ca30",
+                            "docker.io/temporalio/server:1.29.6.1"
+                        ],
+                        "sizeBytes": 249574661
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/thinkpilot/mailon-migrate@sha256:29b78b4712dd5b65122b1b6b50b9814c26998fa2cb671b093d1cd8c9ecfcbff8",
+                            "ghcr.io/thinkpilot/mailon-migrate:latest"
+                        ],
+                        "sizeBytes": 182917200
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/thinkpilot/mailon-migrate@sha256:b2563c8c72d3535782dc092a33d8f595ac04a8e93189a52246d4a0f419781325"
+                        ],
+                        "sizeBytes": 170932497
+                    },
+                    {
+                        "names": [
+                            "docker.io/library/postgres@sha256:081f1bc7bd5e143dbb6e487b710bbc27712cdcfaced4c071b8e47349aa1b4171",
+                            "docker.io/library/postgres:16"
+                        ],
+                        "sizeBytes": 160197799
+                    },
+                    {
+                        "names": [
+                            "docker.io/moby/buildkit@sha256:d76eb1caecac5733ef7553c1e90a1b21f1bb218cd1142d3553de0747b4a14ba9",
+                            "docker.io/moby/buildkit:v0.30.0-rootless"
+                        ],
+                        "sizeBytes": 120649608
+                    },
+                    {
+                        "names": [
+                            "docker.io/temporalio/ui@sha256:49a61456f6b770af926d6d7d74f63ebb4b9a3c5abc4fb68ddb146321d49391e4",
+                            "docker.io/temporalio/ui:2.50.0"
+                        ],
+                        "sizeBytes": 112684758
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/klipper-helm@sha256:aa6dc50066508ce3940f511c318b810046c4f336c5c5edd3469c2f146a13731b",
+                            "docker.io/rancher/klipper-helm:v0.10.0-build20260513"
+                        ],
+                        "sizeBytes": 61161558
+                    },
+                    {
+                        "names": [
+                            "quay.io/jetstack/cert-manager-controller@sha256:fe0623d7d04a382c888f03343a3a2da716e0d96ad3d5d790c0ebcbcb2a4329a5",
+                            "quay.io/jetstack/cert-manager-controller:v1.20.2"
+                        ],
+                        "sizeBytes": 23620607
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/mirrored-coredns-coredns@sha256:b21d26b915e10acb5bc78715c1e8b6047ab2675389b2bcc18b3a6499d90e74c0",
+                            "docker.io/rancher/mirrored-coredns-coredns:1.14.3"
+                        ],
+                        "sizeBytes": 23543069
+                    },
+                    {
+                        "names": [
+                            "quay.io/jetstack/cert-manager-webhook@sha256:baf651128b9f05c426cbd5e60e2036bf382c99ca270f49d0757d6f7d2452f4e5",
+                            "quay.io/jetstack/cert-manager-webhook:v1.20.2"
+                        ],
+                        "sizeBytes": 19484266
+                    },
+                    {
+                        "names": [
+                            "quay.io/jetstack/cert-manager-acmesolver@sha256:cfa55e9c3dcfc6a3cba97575748c1549b04a30fd14d88a2fcb9e2dddef415e2f",
+                            "quay.io/jetstack/cert-manager-acmesolver:v1.20.2"
+                        ],
+                        "sizeBytes": 8213837
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/klipper-lb@sha256:910944bb0bd94f060a82a56ca1ea1c577d3e49b3473a093a47a985f32e92d94a",
+                            "docker.io/rancher/klipper-lb:v0.4.17"
+                        ],
+                        "sizeBytes": 5280144
+                    },
+                    {
+                        "names": [
+                            "docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+                            "docker.io/library/busybox:1.36"
+                        ],
+                        "sizeBytes": 2217006
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/mirrored-library-busybox@sha256:101b4afd76732482eff9b95cae5f94bcf295e521fbec4e01b69c5421f3f3f3e5",
+                            "docker.io/rancher/mirrored-library-busybox:1.37.0"
+                        ],
+                        "sizeBytes": 2151353
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/mirrored-pause@sha256:74c4244427b7312c5b901fe0f67cbc53683d06f4f24c6faee65d4182bf0fa893",
+                            "docker.io/rancher/mirrored-pause:3.6"
+                        ],
+                        "sizeBytes": 301463
+                    }
+                ],
+                "nodeInfo": {
+                    "architecture": "amd64",
+                    "bootID": "7f4ac31a-b533-497a-817a-70280c913807",
+                    "containerRuntimeVersion": "containerd://2.2.3-k3s1",
+                    "kernelVersion": "6.8.0-117-generic",
+                    "kubeProxyVersion": "",
+                    "kubeletVersion": "v1.35.5+k3s1",
+                    "machineID": "69b5eb60c5984b17806f69098ab443fd",
+                    "operatingSystem": "linux",
+                    "osImage": "Ubuntu 24.04.4 LTS",
+                    "systemUUID": "69b5eb60-c598-4b17-806f-69098ab443fd"
+                },
+                "runtimeHandlers": [
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": ""
+                    },
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": "runc"
+                    },
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": false,
+                            "userNamespaces": false
+                        },
+                        "name": "runhcs-wcow-process"
+                    }
+                ]
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Node",
+            "metadata": {
+                "annotations": {
+                    "alpha.kubernetes.io/provided-node-ip": "10.0.1.30",
+                    "etcd.k3s.cattle.io/local-snapshots-timestamp": "2026-06-17T14:57:19Z",
+                    "etcd.k3s.cattle.io/node-address": "10.0.1.30",
+                    "etcd.k3s.cattle.io/node-name": "thinkpilot-k3s-server-319da96f",
+                    "flannel.alpha.coreos.com/backend-data": "{\"VNI\":1,\"VtepMAC\":\"76:c2:bf:d8:c7:a3\"}",
+                    "flannel.alpha.coreos.com/backend-type": "vxlan",
+                    "flannel.alpha.coreos.com/kube-subnet-manager": "true",
+                    "flannel.alpha.coreos.com/public-ip": "10.0.1.30",
+                    "k3s.io/hostname": "thinkpilot-k3s-server",
+                    "k3s.io/internal-ip": "10.0.1.30",
+                    "k3s.io/node-args": "[\"server\",\"--kube-apiserver-arg\",\"oidc-issuer-url=https://dex.backhand.dk\",\"--kube-apiserver-arg\",\"oidc-client-id=kubernetes\",\"--kube-apiserver-arg\",\"oidc-username-claim=email\",\"--kube-apiserver-arg\",\"oidc-username-prefix=oidc:\",\"--kube-apiserver-arg\",\"oidc-groups-claim=groups\",\"--kube-apiserver-arg\",\"oidc-groups-prefix=oidc:\",\"--tls-san\",\"thinkpilot-cluster.backhand.dk\",\"--cluster-init\",\"--node-ip\",\"10.0.1.30\",\"--advertise-address\",\"10.0.1.30\",\"--flannel-iface\",\"enp7s0\",\"--tls-san\",\"167.233.76.168\",\"--tls-san\",\"10.0.1.30\",\"--write-kubeconfig-mode\",\"0644\"]",
+                    "k3s.io/node-config-hash": "N6IIGROOA4UZWYSC4HTQVZBCYZIF2BSI22XCXD22MW3XB4VZSUIA====",
+                    "k3s.io/node-env": "{\"K3S_TOKEN\":\"********\"}",
+                    "node.alpha.kubernetes.io/ttl": "0",
+                    "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+                },
+                "creationTimestamp": "2026-06-14T19:41:24Z",
+                "finalizers": [
+                    "wrangler.cattle.io/node",
+                    "wrangler.cattle.io/managed-etcd-controller"
+                ],
+                "labels": {
+                    "beta.kubernetes.io/arch": "amd64",
+                    "beta.kubernetes.io/instance-type": "k3s",
+                    "beta.kubernetes.io/os": "linux",
+                    "kubernetes.io/arch": "amd64",
+                    "kubernetes.io/hostname": "thinkpilot-k3s-server",
+                    "kubernetes.io/os": "linux",
+                    "node-role.kubernetes.io/control-plane": "true",
+                    "node-role.kubernetes.io/etcd": "true",
+                    "node.kubernetes.io/instance-type": "k3s"
+                },
+                "name": "thinkpilot-k3s-server",
+                "resourceVersion": "769405",
+                "uid": "ecb270e4-a4b3-4906-8ea8-2762eb80b08c"
+            },
+            "spec": {
+                "podCIDR": "10.42.0.0/24",
+                "podCIDRs": [
+                    "10.42.0.0/24"
+                ],
+                "providerID": "k3s://thinkpilot-k3s-server"
+            },
+            "status": {
+                "addresses": [
+                    {
+                        "address": "10.0.1.30",
+                        "type": "InternalIP"
+                    },
+                    {
+                        "address": "thinkpilot-k3s-server",
+                        "type": "Hostname"
+                    }
+                ],
+                "allocatable": {
+                    "cpu": "2",
+                    "ephemeral-storage": "76275967736",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "3905928Ki",
+                    "pods": "110"
+                },
+                "capacity": {
+                    "cpu": "2",
+                    "ephemeral-storage": "78408684Ki",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "3905928Ki",
+                    "pods": "110"
+                },
+                "conditions": [
+                    {
+                        "lastHeartbeatTime": "2026-06-17T14:57:42Z",
+                        "lastTransitionTime": "2026-06-14T19:41:35Z",
+                        "message": "Node is a voting member of the etcd cluster",
+                        "reason": "MemberNotLearner",
+                        "status": "True",
+                        "type": "EtcdIsVoter"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-06-17T14:56:41Z",
+                        "lastTransitionTime": "2026-06-14T19:41:24Z",
+                        "message": "kubelet has sufficient memory available",
+                        "reason": "KubeletHasSufficientMemory",
+                        "status": "False",
+                        "type": "MemoryPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-06-17T14:56:41Z",
+                        "lastTransitionTime": "2026-06-14T19:41:24Z",
+                        "message": "kubelet has no disk pressure",
+                        "reason": "KubeletHasNoDiskPressure",
+                        "status": "False",
+                        "type": "DiskPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-06-17T14:56:41Z",
+                        "lastTransitionTime": "2026-06-14T19:41:24Z",
+                        "message": "kubelet has sufficient PID available",
+                        "reason": "KubeletHasSufficientPID",
+                        "status": "False",
+                        "type": "PIDPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-06-17T14:56:41Z",
+                        "lastTransitionTime": "2026-06-14T19:41:24Z",
+                        "message": "kubelet is posting ready status",
+                        "reason": "KubeletReady",
+                        "status": "True",
+                        "type": "Ready"
+                    }
+                ],
+                "daemonEndpoints": {
+                    "kubeletEndpoint": {
+                        "Port": 10250
+                    }
+                },
+                "features": {
+                    "supplementalGroupsPolicy": true
+                },
+                "images": [
+                    {
+                        "names": [
+                            "docker.io/myoung34/github-runner@sha256:71231f16be5226f91c40d970c49d7e11588aba345eee6ea95ab9dc8e47d0a3d9",
+                            "docker.io/myoung34/github-runner:2.335.1"
+                        ],
+                        "sizeBytes": 847829100
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/thinkpilot/mailon@sha256:c13fa5f379518147020c6e7e8572b6237f2f825569db6838914c9bbf00ba7d94"
+                        ],
+                        "sizeBytes": 795916968
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/thinkpilot/consistant@sha256:c54acf6a01e5d98f69debd2064e1fd2555fa08743e01588a50905bede2428331",
+                            "ghcr.io/thinkpilot/consistant:9624dd2"
+                        ],
+                        "sizeBytes": 619883243
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/thinkpilot/mailon@sha256:9427f104392412706cebdde386a93a4e427206ee14ebc05b2c6f29a73659459e",
+                            "ghcr.io/thinkpilot/mailon:v0.6.5"
+                        ],
+                        "sizeBytes": 545103894
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/thinkpilot/mailon@sha256:e9337465c7402c876ae2e50c1c6cababdfeda2f8a189a7a4cae9d347d402b218",
+                            "ghcr.io/thinkpilot/mailon:0.6.4",
+                            "ghcr.io/thinkpilot/mailon:latest",
+                            "ghcr.io/thinkpilot/mailon:v0.6.4"
+                        ],
+                        "sizeBytes": 545102162
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/thinkpilot/mailon@sha256:7208f5a680bee246bd2c8e1699a8e365210da62312301c6a64593411af7486c4",
+                            "ghcr.io/thinkpilot/mailon:v0.6.6"
+                        ],
+                        "sizeBytes": 545101012
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/local-path-provisioner@sha256:1eba82e9c386038b4af6d69cca7519fac738c28c42735ed48ce70c882ad0d80f",
+                            "docker.io/rancher/local-path-provisioner:v0.0.36"
+                        ],
+                        "sizeBytes": 89390500
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/klipper-helm@sha256:aa6dc50066508ce3940f511c318b810046c4f336c5c5edd3469c2f146a13731b",
+                            "docker.io/rancher/klipper-helm:v0.10.0-build20260513"
+                        ],
+                        "sizeBytes": 61161558
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/mirrored-library-traefik@sha256:34d5089d0b414945342848518b383f11f5b3a645504ed87b77ffeb9d683d0e48",
+                            "docker.io/rancher/mirrored-library-traefik:3.6.13"
+                        ],
+                        "sizeBytes": 52544104
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/dexidp/dex@sha256:5d0656fce7d453c0e3b2706abf40c0d0ce5b371fb0b73b3cf714d05f35fa5f86",
+                            "ghcr.io/dexidp/dex:v2.44.0"
+                        ],
+                        "sizeBytes": 45872393
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/mirrored-coredns-coredns@sha256:b21d26b915e10acb5bc78715c1e8b6047ab2675389b2bcc18b3a6499d90e74c0",
+                            "docker.io/rancher/mirrored-coredns-coredns:1.14.3"
+                        ],
+                        "sizeBytes": 23543069
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/mirrored-metrics-server@sha256:b2d2efaf5ac3b366ed0f839d2412a2c4279d4fc2a2a733f12c52133faed36c41",
+                            "docker.io/rancher/mirrored-metrics-server:v0.8.1"
+                        ],
+                        "sizeBytes": 22550016
+                    },
+                    {
+                        "names": [
+                            "quay.io/jetstack/cert-manager-cainjector@sha256:6f5a644135887b2aa7d5cc145072fa56421560e3586ff1f184358022d490f4e1",
+                            "quay.io/jetstack/cert-manager-cainjector:v1.20.2"
+                        ],
+                        "sizeBytes": 16383134
+                    },
+                    {
+                        "names": [
+                            "quay.io/jetstack/cert-manager-acmesolver@sha256:cfa55e9c3dcfc6a3cba97575748c1549b04a30fd14d88a2fcb9e2dddef415e2f",
+                            "quay.io/jetstack/cert-manager-acmesolver:v1.20.2"
+                        ],
+                        "sizeBytes": 8213837
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/klipper-lb@sha256:910944bb0bd94f060a82a56ca1ea1c577d3e49b3473a093a47a985f32e92d94a",
+                            "docker.io/rancher/klipper-lb:v0.4.17"
+                        ],
+                        "sizeBytes": 5280144
+                    },
+                    {
+                        "names": [
+                            "docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+                            "docker.io/library/busybox:1.36"
+                        ],
+                        "sizeBytes": 2217006
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/mirrored-pause@sha256:74c4244427b7312c5b901fe0f67cbc53683d06f4f24c6faee65d4182bf0fa893",
+                            "docker.io/rancher/mirrored-pause:3.6"
+                        ],
+                        "sizeBytes": 301463
+                    }
+                ],
+                "nodeInfo": {
+                    "architecture": "amd64",
+                    "bootID": "93633399-5c39-46b7-ab89-0ed8e7d421b9",
+                    "containerRuntimeVersion": "containerd://2.2.3-k3s1",
+                    "kernelVersion": "6.8.0-117-generic",
+                    "kubeProxyVersion": "",
+                    "kubeletVersion": "v1.35.5+k3s1",
+                    "machineID": "d5e2e78cf88a4405954bb847640a699b",
+                    "operatingSystem": "linux",
+                    "osImage": "Ubuntu 24.04.4 LTS",
+                    "systemUUID": "d5e2e78c-f88a-4405-954b-b847640a699b"
+                },
+                "runtimeHandlers": [
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": ""
+                    },
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": "runc"
+                    },
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": false,
+                            "userNamespaces": false
+                        },
+                        "name": "runhcs-wcow-process"
+                    }
+                ]
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

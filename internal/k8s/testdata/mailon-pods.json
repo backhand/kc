@@ -1,0 +1,2729 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": "2026-06-14T20:29:56.028Z"
+                },
+                "creationTimestamp": "2026-06-17T14:22:09Z",
+                "generateName": "ingester-5b4fbbb9c8-",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/component": "ingester",
+                    "app.kubernetes.io/name": "mailon",
+                    "pod-template-hash": "5b4fbbb9c8"
+                },
+                "name": "ingester-5b4fbbb9c8-kjg69",
+                "namespace": "mailon",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "ingester-5b4fbbb9c8",
+                        "uid": "ae320eb7-8df0-47c3-920a-f44da41e6348"
+                    }
+                ],
+                "resourceVersion": "768666",
+                "uid": "5d1f0c55-e105-4cd4-bbcc-8df8de2fe8f7"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "node",
+                            "apps/workers/ingester/dist/index.js"
+                        ],
+                        "envFrom": [
+                            {
+                                "configMapRef": {
+                                    "name": "mailon-config"
+                                }
+                            },
+                            {
+                                "secretRef": {
+                                    "name": "mailon-secret"
+                                }
+                            }
+                        ],
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.9",
+                        "imagePullPolicy": "Always",
+                        "name": "ingester",
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-ng99k",
+                                "readOnly": true
+                            }
+                        ],
+                        "workingDir": "/app"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "imagePullSecrets": [
+                    {
+                        "name": "ghcr-pull"
+                    }
+                ],
+                "nodeName": "thinkpilot-k3s-server",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-ng99k",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:11Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:09Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:09Z",
+                        "message": "containers with unready status: [ingester]",
+                        "observedGeneration": 1,
+                        "reason": "ContainersNotReady",
+                        "status": "False",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:09Z",
+                        "message": "containers with unready status: [ingester]",
+                        "observedGeneration": 1,
+                        "reason": "ContainersNotReady",
+                        "status": "False",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:09Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.9",
+                        "imageID": "",
+                        "lastState": {},
+                        "name": "ingester",
+                        "ready": false,
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "waiting": {
+                                "message": "Back-off pulling image \"ghcr.io/thinkpilot/mailon:v0.6.9\": ErrImagePull: rpc error: code = NotFound desc = failed to pull and unpack image \"ghcr.io/thinkpilot/mailon:v0.6.9\": failed to resolve reference \"ghcr.io/thinkpilot/mailon:v0.6.9\": ghcr.io/thinkpilot/mailon:v0.6.9: not found",
+                                "reason": "ImagePullBackOff"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-ng99k",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.0.1.30",
+                "hostIPs": [
+                    {
+                        "ip": "10.0.1.30"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Pending",
+                "podIP": "10.42.0.42",
+                "podIPs": [
+                    {
+                        "ip": "10.42.0.42"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-06-17T14:22:09Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": "2026-06-14T20:29:56.028Z"
+                },
+                "creationTimestamp": "2026-06-17T13:33:26Z",
+                "generateName": "ingester-6b9645cf4c-",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/component": "ingester",
+                    "app.kubernetes.io/name": "mailon",
+                    "pod-template-hash": "6b9645cf4c"
+                },
+                "name": "ingester-6b9645cf4c-q8ddv",
+                "namespace": "mailon",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "ingester-6b9645cf4c",
+                        "uid": "1989ce15-958d-43e0-808e-4a14d706a476"
+                    }
+                ],
+                "resourceVersion": "752266",
+                "uid": "606da10f-773d-4394-af02-153411c83eca"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "node",
+                            "apps/workers/ingester/dist/index.js"
+                        ],
+                        "envFrom": [
+                            {
+                                "configMapRef": {
+                                    "name": "mailon-config"
+                                }
+                            },
+                            {
+                                "secretRef": {
+                                    "name": "mailon-secret"
+                                }
+                            }
+                        ],
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.6",
+                        "imagePullPolicy": "Always",
+                        "name": "ingester",
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-wr4wr",
+                                "readOnly": true
+                            }
+                        ],
+                        "workingDir": "/app"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "imagePullSecrets": [
+                    {
+                        "name": "ghcr-pull"
+                    }
+                ],
+                "nodeName": "thinkpilot-k3s-server",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-wr4wr",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:02Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:33:26Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:02Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:02Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:33:26Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "100m",
+                            "memory": "256Mi"
+                        },
+                        "containerID": "containerd://a99ab69fecf812df6bf22189a486ed650a67680d2a3ce0413869337efac30ddc",
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.6",
+                        "imageID": "ghcr.io/thinkpilot/mailon@sha256:7208f5a680bee246bd2c8e1699a8e365210da62312301c6a64593411af7486c4",
+                        "lastState": {},
+                        "name": "ingester",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-06-17T13:34:01Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 1000,
+                                "supplementalGroups": [
+                                    1000
+                                ],
+                                "uid": 1000
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-wr4wr",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.0.1.30",
+                "hostIPs": [
+                    {
+                        "ip": "10.0.1.30"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Running",
+                "podIP": "10.42.0.37",
+                "podIPs": [
+                    {
+                        "ip": "10.42.0.37"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-06-17T13:33:26Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": "2026-06-14T20:30:00.378Z"
+                },
+                "creationTimestamp": "2026-06-17T14:22:10Z",
+                "generateName": "knowledge-5b577b456-",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/component": "knowledge",
+                    "app.kubernetes.io/name": "mailon",
+                    "pod-template-hash": "5b577b456"
+                },
+                "name": "knowledge-5b577b456-lgfzw",
+                "namespace": "mailon",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "knowledge-5b577b456",
+                        "uid": "a49cfb9c-2b90-46a1-aae8-2fd228678466"
+                    }
+                ],
+                "resourceVersion": "768785",
+                "uid": "6543037e-e30e-45c8-8a36-1e44e0d6c073"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "node",
+                            "apps/workers/knowledge/dist/index.js"
+                        ],
+                        "envFrom": [
+                            {
+                                "configMapRef": {
+                                    "name": "mailon-config"
+                                }
+                            },
+                            {
+                                "secretRef": {
+                                    "name": "mailon-secret"
+                                }
+                            }
+                        ],
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.9",
+                        "imagePullPolicy": "Always",
+                        "name": "knowledge",
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-jglvc",
+                                "readOnly": true
+                            }
+                        ],
+                        "workingDir": "/app"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "imagePullSecrets": [
+                    {
+                        "name": "ghcr-pull"
+                    }
+                ],
+                "nodeName": "thinkpilot-k3s-agent-0",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-jglvc",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:11Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:10Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:10Z",
+                        "message": "containers with unready status: [knowledge]",
+                        "observedGeneration": 1,
+                        "reason": "ContainersNotReady",
+                        "status": "False",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:10Z",
+                        "message": "containers with unready status: [knowledge]",
+                        "observedGeneration": 1,
+                        "reason": "ContainersNotReady",
+                        "status": "False",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:10Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.9",
+                        "imageID": "",
+                        "lastState": {},
+                        "name": "knowledge",
+                        "ready": false,
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "waiting": {
+                                "message": "Back-off pulling image \"ghcr.io/thinkpilot/mailon:v0.6.9\": ErrImagePull: rpc error: code = NotFound desc = failed to pull and unpack image \"ghcr.io/thinkpilot/mailon:v0.6.9\": failed to resolve reference \"ghcr.io/thinkpilot/mailon:v0.6.9\": ghcr.io/thinkpilot/mailon:v0.6.9: not found",
+                                "reason": "ImagePullBackOff"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-jglvc",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.0.1.40",
+                "hostIPs": [
+                    {
+                        "ip": "10.0.1.40"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Pending",
+                "podIP": "10.42.1.96",
+                "podIPs": [
+                    {
+                        "ip": "10.42.1.96"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-06-17T14:22:10Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": "2026-06-14T20:30:00.378Z"
+                },
+                "creationTimestamp": "2026-06-17T13:33:26Z",
+                "generateName": "knowledge-8d99d787f-",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/component": "knowledge",
+                    "app.kubernetes.io/name": "mailon",
+                    "pod-template-hash": "8d99d787f"
+                },
+                "name": "knowledge-8d99d787f-rt48q",
+                "namespace": "mailon",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "knowledge-8d99d787f",
+                        "uid": "95f3a8b5-e224-4778-a213-82f1a5ec282a"
+                    }
+                ],
+                "resourceVersion": "752278",
+                "uid": "c59b28b5-45b1-4cf3-afa1-66d4ab5ed2c4"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "node",
+                            "apps/workers/knowledge/dist/index.js"
+                        ],
+                        "envFrom": [
+                            {
+                                "configMapRef": {
+                                    "name": "mailon-config"
+                                }
+                            },
+                            {
+                                "secretRef": {
+                                    "name": "mailon-secret"
+                                }
+                            }
+                        ],
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.6",
+                        "imagePullPolicy": "Always",
+                        "name": "knowledge",
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-htw5x",
+                                "readOnly": true
+                            }
+                        ],
+                        "workingDir": "/app"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "imagePullSecrets": [
+                    {
+                        "name": "ghcr-pull"
+                    }
+                ],
+                "nodeName": "thinkpilot-k3s-server",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-htw5x",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:02Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:33:26Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:02Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:02Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:33:26Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "100m",
+                            "memory": "256Mi"
+                        },
+                        "containerID": "containerd://59f22ca0f4a0775b7dc62c173a39c15b96d8acfcdee9e07a6715d704d503855c",
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.6",
+                        "imageID": "ghcr.io/thinkpilot/mailon@sha256:7208f5a680bee246bd2c8e1699a8e365210da62312301c6a64593411af7486c4",
+                        "lastState": {},
+                        "name": "knowledge",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-06-17T13:34:01Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 1000,
+                                "supplementalGroups": [
+                                    1000
+                                ],
+                                "uid": 1000
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-htw5x",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.0.1.30",
+                "hostIPs": [
+                    {
+                        "ip": "10.0.1.30"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Running",
+                "podIP": "10.42.0.38",
+                "podIPs": [
+                    {
+                        "ip": "10.42.0.38"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-06-17T13:33:26Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": "2026-06-14T20:30:03.295Z"
+                },
+                "creationTimestamp": "2026-06-17T13:33:27Z",
+                "generateName": "responder-67ddbfcc46-",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/component": "responder",
+                    "app.kubernetes.io/name": "mailon",
+                    "pod-template-hash": "67ddbfcc46"
+                },
+                "name": "responder-67ddbfcc46-zdsnl",
+                "namespace": "mailon",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "responder-67ddbfcc46",
+                        "uid": "9a7cca4e-3e47-4ba4-8935-70714d4ae9eb"
+                    }
+                ],
+                "resourceVersion": "752257",
+                "uid": "3b6bd0e2-2c42-4831-b6c1-75a272e6ba9e"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "node",
+                            "apps/workers/responder/dist/index.js"
+                        ],
+                        "envFrom": [
+                            {
+                                "configMapRef": {
+                                    "name": "mailon-config"
+                                }
+                            },
+                            {
+                                "secretRef": {
+                                    "name": "mailon-secret"
+                                }
+                            }
+                        ],
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.6",
+                        "imagePullPolicy": "Always",
+                        "name": "responder",
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-6xkff",
+                                "readOnly": true
+                            }
+                        ],
+                        "workingDir": "/app"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "imagePullSecrets": [
+                    {
+                        "name": "ghcr-pull"
+                    }
+                ],
+                "nodeName": "thinkpilot-k3s-server",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-6xkff",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:02Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:33:27Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:02Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:02Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:33:27Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "100m",
+                            "memory": "256Mi"
+                        },
+                        "containerID": "containerd://58e1e7891d05147db3a21978cfe37e3f871c0afd43ab7b89732e54649fedbde2",
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.6",
+                        "imageID": "ghcr.io/thinkpilot/mailon@sha256:7208f5a680bee246bd2c8e1699a8e365210da62312301c6a64593411af7486c4",
+                        "lastState": {},
+                        "name": "responder",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-06-17T13:34:01Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 1000,
+                                "supplementalGroups": [
+                                    1000
+                                ],
+                                "uid": 1000
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-6xkff",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.0.1.30",
+                "hostIPs": [
+                    {
+                        "ip": "10.0.1.30"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Running",
+                "podIP": "10.42.0.39",
+                "podIPs": [
+                    {
+                        "ip": "10.42.0.39"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-06-17T13:33:27Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": "2026-06-14T20:30:03.295Z"
+                },
+                "creationTimestamp": "2026-06-17T14:22:10Z",
+                "generateName": "responder-67df56d977-",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/component": "responder",
+                    "app.kubernetes.io/name": "mailon",
+                    "pod-template-hash": "67df56d977"
+                },
+                "name": "responder-67df56d977-hh7cj",
+                "namespace": "mailon",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "responder-67df56d977",
+                        "uid": "cca82f99-3ab3-43e9-8a17-79cd340ffc94"
+                    }
+                ],
+                "resourceVersion": "768611",
+                "uid": "6b5a9b9e-853b-4591-a2bb-1331f6a94acc"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "node",
+                            "apps/workers/responder/dist/index.js"
+                        ],
+                        "envFrom": [
+                            {
+                                "configMapRef": {
+                                    "name": "mailon-config"
+                                }
+                            },
+                            {
+                                "secretRef": {
+                                    "name": "mailon-secret"
+                                }
+                            }
+                        ],
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.9",
+                        "imagePullPolicy": "Always",
+                        "name": "responder",
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-fqp8t",
+                                "readOnly": true
+                            }
+                        ],
+                        "workingDir": "/app"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "imagePullSecrets": [
+                    {
+                        "name": "ghcr-pull"
+                    }
+                ],
+                "nodeName": "thinkpilot-k3s-agent-0",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-fqp8t",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:11Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:10Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:10Z",
+                        "message": "containers with unready status: [responder]",
+                        "observedGeneration": 1,
+                        "reason": "ContainersNotReady",
+                        "status": "False",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:10Z",
+                        "message": "containers with unready status: [responder]",
+                        "observedGeneration": 1,
+                        "reason": "ContainersNotReady",
+                        "status": "False",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:10Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.9",
+                        "imageID": "",
+                        "lastState": {},
+                        "name": "responder",
+                        "ready": false,
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "waiting": {
+                                "message": "Back-off pulling image \"ghcr.io/thinkpilot/mailon:v0.6.9\": ErrImagePull: rpc error: code = NotFound desc = failed to pull and unpack image \"ghcr.io/thinkpilot/mailon:v0.6.9\": failed to resolve reference \"ghcr.io/thinkpilot/mailon:v0.6.9\": ghcr.io/thinkpilot/mailon:v0.6.9: not found",
+                                "reason": "ImagePullBackOff"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-fqp8t",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.0.1.40",
+                "hostIPs": [
+                    {
+                        "ip": "10.0.1.40"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Pending",
+                "podIP": "10.42.1.97",
+                "podIPs": [
+                    {
+                        "ip": "10.42.1.97"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-06-17T14:22:10Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": "2026-06-14T20:30:07.117Z"
+                },
+                "creationTimestamp": "2026-06-17T13:33:27Z",
+                "generateName": "sender-67fb879f76-",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/component": "sender",
+                    "app.kubernetes.io/name": "mailon",
+                    "pod-template-hash": "67fb879f76"
+                },
+                "name": "sender-67fb879f76-k5d45",
+                "namespace": "mailon",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "sender-67fb879f76",
+                        "uid": "7bd16811-82dc-4c6e-8772-ecad9c80c862"
+                    }
+                ],
+                "resourceVersion": "752261",
+                "uid": "f7f0f91c-fd50-4429-84e3-5b9d5a1547aa"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "node",
+                            "apps/workers/sender/dist/index.js"
+                        ],
+                        "envFrom": [
+                            {
+                                "configMapRef": {
+                                    "name": "mailon-config"
+                                }
+                            },
+                            {
+                                "secretRef": {
+                                    "name": "mailon-secret"
+                                }
+                            }
+                        ],
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.6",
+                        "imagePullPolicy": "Always",
+                        "name": "sender",
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-dh6p7",
+                                "readOnly": true
+                            }
+                        ],
+                        "workingDir": "/app"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "imagePullSecrets": [
+                    {
+                        "name": "ghcr-pull"
+                    }
+                ],
+                "nodeName": "thinkpilot-k3s-server",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-dh6p7",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:02Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:33:27Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:02Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:02Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:33:27Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "100m",
+                            "memory": "256Mi"
+                        },
+                        "containerID": "containerd://f961b26209a84b522db688a67d3803b989eced58319578dd0a09ee15e4cd2734",
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.6",
+                        "imageID": "ghcr.io/thinkpilot/mailon@sha256:7208f5a680bee246bd2c8e1699a8e365210da62312301c6a64593411af7486c4",
+                        "lastState": {},
+                        "name": "sender",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-06-17T13:34:01Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 1000,
+                                "supplementalGroups": [
+                                    1000
+                                ],
+                                "uid": 1000
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-dh6p7",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.0.1.30",
+                "hostIPs": [
+                    {
+                        "ip": "10.0.1.30"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Running",
+                "podIP": "10.42.0.40",
+                "podIPs": [
+                    {
+                        "ip": "10.42.0.40"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-06-17T13:33:27Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": "2026-06-14T20:30:07.117Z"
+                },
+                "creationTimestamp": "2026-06-17T14:22:10Z",
+                "generateName": "sender-d5c7744d9-",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/component": "sender",
+                    "app.kubernetes.io/name": "mailon",
+                    "pod-template-hash": "d5c7744d9"
+                },
+                "name": "sender-d5c7744d9-xl2sl",
+                "namespace": "mailon",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "sender-d5c7744d9",
+                        "uid": "bbd3ad64-202f-4e87-bf74-09fa8cc2ec68"
+                    }
+                ],
+                "resourceVersion": "768645",
+                "uid": "7fbff9c2-9011-4053-ba1d-59269f6a1358"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "node",
+                            "apps/workers/sender/dist/index.js"
+                        ],
+                        "envFrom": [
+                            {
+                                "configMapRef": {
+                                    "name": "mailon-config"
+                                }
+                            },
+                            {
+                                "secretRef": {
+                                    "name": "mailon-secret"
+                                }
+                            }
+                        ],
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.9",
+                        "imagePullPolicy": "Always",
+                        "name": "sender",
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-vqwf5",
+                                "readOnly": true
+                            }
+                        ],
+                        "workingDir": "/app"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "imagePullSecrets": [
+                    {
+                        "name": "ghcr-pull"
+                    }
+                ],
+                "nodeName": "thinkpilot-k3s-agent-0",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-vqwf5",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:12Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:10Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:10Z",
+                        "message": "containers with unready status: [sender]",
+                        "observedGeneration": 1,
+                        "reason": "ContainersNotReady",
+                        "status": "False",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:10Z",
+                        "message": "containers with unready status: [sender]",
+                        "observedGeneration": 1,
+                        "reason": "ContainersNotReady",
+                        "status": "False",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:10Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.9",
+                        "imageID": "",
+                        "lastState": {},
+                        "name": "sender",
+                        "ready": false,
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "waiting": {
+                                "message": "Back-off pulling image \"ghcr.io/thinkpilot/mailon:v0.6.9\": ErrImagePull: rpc error: code = NotFound desc = failed to pull and unpack image \"ghcr.io/thinkpilot/mailon:v0.6.9\": failed to resolve reference \"ghcr.io/thinkpilot/mailon:v0.6.9\": ghcr.io/thinkpilot/mailon:v0.6.9: not found",
+                                "reason": "ImagePullBackOff"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-vqwf5",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.0.1.40",
+                "hostIPs": [
+                    {
+                        "ip": "10.0.1.40"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Pending",
+                "podIP": "10.42.1.98",
+                "podIPs": [
+                    {
+                        "ip": "10.42.1.98"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-06-17T14:22:10Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": "2026-06-15T14:23:22.701Z"
+                },
+                "creationTimestamp": "2026-06-17T14:22:11Z",
+                "generateName": "web-7f88d89f47-",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/component": "web",
+                    "app.kubernetes.io/name": "mailon",
+                    "pod-template-hash": "7f88d89f47"
+                },
+                "name": "web-7f88d89f47-z5csz",
+                "namespace": "mailon",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "web-7f88d89f47",
+                        "uid": "28a3d062-7116-4f60-99ad-94ea185a6442"
+                    }
+                ],
+                "resourceVersion": "768612",
+                "uid": "776d0ba5-4c00-46ba-83a7-e0c7d8a80c1e"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "node",
+                            "apps/web/server.js"
+                        ],
+                        "envFrom": [
+                            {
+                                "configMapRef": {
+                                    "name": "mailon-config"
+                                }
+                            },
+                            {
+                                "secretRef": {
+                                    "name": "mailon-secret"
+                                }
+                            }
+                        ],
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.9",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/api/health",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 15,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "name": "web",
+                        "ports": [
+                            {
+                                "containerPort": 3000,
+                                "name": "http",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/api/health",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 5,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "250m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-t5t95",
+                                "readOnly": true
+                            }
+                        ],
+                        "workingDir": "/app"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "imagePullSecrets": [
+                    {
+                        "name": "ghcr-pull"
+                    }
+                ],
+                "nodeName": "thinkpilot-k3s-agent-0",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-t5t95",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:12Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:11Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:11Z",
+                        "message": "containers with unready status: [web]",
+                        "observedGeneration": 1,
+                        "reason": "ContainersNotReady",
+                        "status": "False",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:11Z",
+                        "message": "containers with unready status: [web]",
+                        "observedGeneration": 1,
+                        "reason": "ContainersNotReady",
+                        "status": "False",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T14:22:11Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.9",
+                        "imageID": "",
+                        "lastState": {},
+                        "name": "web",
+                        "ready": false,
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "waiting": {
+                                "message": "Back-off pulling image \"ghcr.io/thinkpilot/mailon:v0.6.9\": ErrImagePull: rpc error: code = NotFound desc = failed to pull and unpack image \"ghcr.io/thinkpilot/mailon:v0.6.9\": failed to resolve reference \"ghcr.io/thinkpilot/mailon:v0.6.9\": ghcr.io/thinkpilot/mailon:v0.6.9: not found",
+                                "reason": "ImagePullBackOff"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-t5t95",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.0.1.40",
+                "hostIPs": [
+                    {
+                        "ip": "10.0.1.40"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Pending",
+                "podIP": "10.42.1.99",
+                "podIPs": [
+                    {
+                        "ip": "10.42.1.99"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-06-17T14:22:11Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": "2026-06-15T14:23:22.701Z"
+                },
+                "creationTimestamp": "2026-06-17T13:33:27Z",
+                "generateName": "web-dbbd9bc4b-",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/component": "web",
+                    "app.kubernetes.io/name": "mailon",
+                    "pod-template-hash": "dbbd9bc4b"
+                },
+                "name": "web-dbbd9bc4b-bq7bl",
+                "namespace": "mailon",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "web-dbbd9bc4b",
+                        "uid": "2a6c2c5a-a166-498b-b667-75665d51b37b"
+                    }
+                ],
+                "resourceVersion": "752354",
+                "uid": "83e4fc7f-e57a-4fca-8e7d-d2afbc0faee5"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "node",
+                            "apps/web/server.js"
+                        ],
+                        "envFrom": [
+                            {
+                                "configMapRef": {
+                                    "name": "mailon-config"
+                                }
+                            },
+                            {
+                                "secretRef": {
+                                    "name": "mailon-secret"
+                                }
+                            }
+                        ],
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.6",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/api/health",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 15,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "name": "web",
+                        "ports": [
+                            {
+                                "containerPort": 3000,
+                                "name": "http",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/api/health",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 5,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "250m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-njj7c",
+                                "readOnly": true
+                            }
+                        ],
+                        "workingDir": "/app"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "imagePullSecrets": [
+                    {
+                        "name": "ghcr-pull"
+                    }
+                ],
+                "nodeName": "thinkpilot-k3s-agent-0",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-njj7c",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:00Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:33:27Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:11Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:11Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:33:27Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "250m",
+                            "memory": "256Mi"
+                        },
+                        "containerID": "containerd://ccf453b4fe91652de5acaca1c5c77050ec6403c1d652fcceba0b9cb46592dd14",
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.6",
+                        "imageID": "ghcr.io/thinkpilot/mailon@sha256:7208f5a680bee246bd2c8e1699a8e365210da62312301c6a64593411af7486c4",
+                        "lastState": {},
+                        "name": "web",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "250m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-06-17T13:34:00Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 1000,
+                                "supplementalGroups": [
+                                    1000
+                                ],
+                                "uid": 1000
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-njj7c",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.0.1.40",
+                "hostIPs": [
+                    {
+                        "ip": "10.0.1.40"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Running",
+                "podIP": "10.42.1.89",
+                "podIPs": [
+                    {
+                        "ip": "10.42.1.89"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-06-17T13:33:27Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": "2026-06-15T14:23:22.701Z"
+                },
+                "creationTimestamp": "2026-06-17T13:34:11Z",
+                "generateName": "web-dbbd9bc4b-",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/component": "web",
+                    "app.kubernetes.io/name": "mailon",
+                    "pod-template-hash": "dbbd9bc4b"
+                },
+                "name": "web-dbbd9bc4b-gvxqz",
+                "namespace": "mailon",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "web-dbbd9bc4b",
+                        "uid": "2a6c2c5a-a166-498b-b667-75665d51b37b"
+                    }
+                ],
+                "resourceVersion": "752437",
+                "uid": "763ae1d4-4e5b-4804-bf67-356cb6ccf78e"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "node",
+                            "apps/web/server.js"
+                        ],
+                        "envFrom": [
+                            {
+                                "configMapRef": {
+                                    "name": "mailon-config"
+                                }
+                            },
+                            {
+                                "secretRef": {
+                                    "name": "mailon-secret"
+                                }
+                            }
+                        ],
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.6",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/api/health",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 15,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "name": "web",
+                        "ports": [
+                            {
+                                "containerPort": 3000,
+                                "name": "http",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/api/health",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 5,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "250m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-7hhqj",
+                                "readOnly": true
+                            }
+                        ],
+                        "workingDir": "/app"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "imagePullSecrets": [
+                    {
+                        "name": "ghcr-pull"
+                    }
+                ],
+                "nodeName": "thinkpilot-k3s-server",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-7hhqj",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:13Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:11Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:25Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:25Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-17T13:34:11Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "250m",
+                            "memory": "256Mi"
+                        },
+                        "containerID": "containerd://b2a2c093415765969bb1421ccb78e378c32d9721449de1f1e2837b5b1e6c3ef2",
+                        "image": "ghcr.io/thinkpilot/mailon:v0.6.6",
+                        "imageID": "ghcr.io/thinkpilot/mailon@sha256:7208f5a680bee246bd2c8e1699a8e365210da62312301c6a64593411af7486c4",
+                        "lastState": {},
+                        "name": "web",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "250m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-06-17T13:34:12Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 1000,
+                                "supplementalGroups": [
+                                    1000
+                                ],
+                                "uid": 1000
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-7hhqj",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.0.1.30",
+                "hostIPs": [
+                    {
+                        "ip": "10.0.1.30"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Running",
+                "podIP": "10.42.0.41",
+                "podIPs": [
+                    {
+                        "ip": "10.42.0.41"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-06-17T13:34:11Z"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}
