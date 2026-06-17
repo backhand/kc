@@ -9,9 +9,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/exp/teatest"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/cache"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/store"
+	"github.com/backhand/kc/internal/cache"
+	"github.com/backhand/kc/internal/k8s"
+	"github.com/backhand/kc/internal/store"
 )
 
 // Headless tests for the search-everywhere modal (the `/` op). They inject fake

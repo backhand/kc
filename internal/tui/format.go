@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
+	"github.com/backhand/kc/internal/k8s"
 )
 
 // formatCPU renders millicores compactly: "250m", "1.50" (cores) once ≥ 1000m.

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/exec"
+	"github.com/backhand/kc/internal/exec"
 )
 
 // Read-only kubectl wrappers.

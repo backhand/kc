@@ -8,8 +8,8 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/store"
+	"github.com/backhand/kc/internal/k8s"
+	"github.com/backhand/kc/internal/store"
 )
 
 // The search-everywhere modal (the `/` op): jump to any resource cluster-wide.

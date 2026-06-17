@@ -8,10 +8,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/deploy"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/git"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/github"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
+	"github.com/backhand/kc/internal/deploy"
+	"github.com/backhand/kc/internal/git"
+	"github.com/backhand/kc/internal/github"
+	"github.com/backhand/kc/internal/k8s"
 )
 
 // releaseLimit is how many latest releases the deploy modal shows per page

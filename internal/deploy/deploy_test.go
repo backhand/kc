@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/exec"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
+	"github.com/backhand/kc/internal/exec"
+	"github.com/backhand/kc/internal/k8s"
 )
 
 // Unit tests for the ONLY mutating helper in kc. These assert the constructed

@@ -6,8 +6,8 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/deploy"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/github"
+	"github.com/backhand/kc/internal/deploy"
+	"github.com/backhand/kc/internal/github"
 )
 
 // Rendering for the deploy modal (SPEC "Deploy flow (v1)"). Plain, scannable

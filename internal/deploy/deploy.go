@@ -26,8 +26,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/exec"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
+	"github.com/backhand/kc/internal/exec"
+	"github.com/backhand/kc/internal/k8s"
 )
 
 // AllContainers is the kubectl wildcard that targets every container in the pod

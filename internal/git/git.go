@@ -13,7 +13,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/exec"
+	"github.com/backhand/kc/internal/exec"
 )
 
 // RepoRef is a parsed git origin → GitHub coordinates.

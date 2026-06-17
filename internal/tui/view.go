@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
+	"github.com/backhand/kc/internal/k8s"
 )
 
 // ── Styles ──────────────────────────────────────────────────────────────────

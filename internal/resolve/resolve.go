@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
+	"github.com/backhand/kc/internal/k8s"
 )
 
 // ResolvedNamespace is a namespace resolved from a repo's image, with the

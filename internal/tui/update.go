@@ -6,8 +6,8 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/store"
+	"github.com/backhand/kc/internal/k8s"
+	"github.com/backhand/kc/internal/store"
 )
 
 // Update folds messages into the model: key navigation (zoom in/out, move the

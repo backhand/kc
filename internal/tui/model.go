@@ -25,11 +25,11 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/cache"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/deploy"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/resolve"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/store"
+	"github.com/backhand/kc/internal/cache"
+	"github.com/backhand/kc/internal/deploy"
+	"github.com/backhand/kc/internal/k8s"
+	"github.com/backhand/kc/internal/resolve"
+	"github.com/backhand/kc/internal/store"
 )
 
 // refreshInterval is how often the visible level re-fetches for a live feel

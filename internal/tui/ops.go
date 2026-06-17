@@ -8,9 +8,9 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/deploy"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/store"
+	"github.com/backhand/kc/internal/deploy"
+	"github.com/backhand/kc/internal/k8s"
+	"github.com/backhand/kc/internal/store"
 )
 
 // The contextual operations on the selected workload (SPEC "Operations"):

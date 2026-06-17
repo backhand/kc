@@ -11,12 +11,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/exp/teatest"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/cache"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/exec"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/git"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/github"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/store"
+	"github.com/backhand/kc/internal/cache"
+	"github.com/backhand/kc/internal/exec"
+	"github.com/backhand/kc/internal/git"
+	"github.com/backhand/kc/internal/github"
+	"github.com/backhand/kc/internal/k8s"
+	"github.com/backhand/kc/internal/store"
 )
 
 // Headless deploy-flow tests (teatest). They drive the modal end-to-end with:

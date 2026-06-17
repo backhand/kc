@@ -4,8 +4,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/git"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
+	"github.com/backhand/kc/internal/git"
+	"github.com/backhand/kc/internal/k8s"
 )
 
 // Pure planning helpers: derive the release repo from running deployments and

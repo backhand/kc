@@ -4,11 +4,11 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/deploy"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/git"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/github"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/store"
+	"github.com/backhand/kc/internal/deploy"
+	"github.com/backhand/kc/internal/git"
+	"github.com/backhand/kc/internal/github"
+	"github.com/backhand/kc/internal/k8s"
+	"github.com/backhand/kc/internal/store"
 )
 
 // The deploy modal (SPEC "Deploy flow (v1)"). A four-phase flow overlaid on the

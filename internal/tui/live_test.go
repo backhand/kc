@@ -19,10 +19,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/exp/teatest"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/cache"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/git"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/resolve"
+	"github.com/backhand/kc/internal/cache"
+	"github.com/backhand/kc/internal/git"
+	"github.com/backhand/kc/internal/k8s"
+	"github.com/backhand/kc/internal/resolve"
 )
 
 func liveDeps(t *testing.T) Deps {

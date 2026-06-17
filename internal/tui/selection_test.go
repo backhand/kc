@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
+	"github.com/backhand/kc/internal/k8s"
 )
 
 // Unit tests for the shared selection model's ←/→ preset cycling (Feature 1).

@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
+	"github.com/backhand/kc/internal/k8s"
 )
 
 // Unit tests for repo → namespace resolution (pure core), incl. multi-namespace

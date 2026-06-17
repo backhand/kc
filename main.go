@@ -17,13 +17,13 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/cache"
-	xexec "github.com/thinkpilot/infrastructure/tools/kc/internal/exec"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/git"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/resolve"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/store"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/tui"
+	"github.com/backhand/kc/internal/cache"
+	xexec "github.com/backhand/kc/internal/exec"
+	"github.com/backhand/kc/internal/git"
+	"github.com/backhand/kc/internal/k8s"
+	"github.com/backhand/kc/internal/resolve"
+	"github.com/backhand/kc/internal/store"
+	"github.com/backhand/kc/internal/tui"
 )
 
 func main() {

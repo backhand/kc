@@ -1,4 +1,4 @@
-module github.com/thinkpilot/infrastructure/tools/kc
+module github.com/backhand/kc
 
 go 1.24.2
 

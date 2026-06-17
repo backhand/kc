@@ -28,8 +28,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/exec"
-	"github.com/thinkpilot/infrastructure/tools/kc/internal/git"
+	"github.com/backhand/kc/internal/exec"
+	"github.com/backhand/kc/internal/git"
 )
 
 // BuildStatus is the build status of a release's image, cross-referenced from
