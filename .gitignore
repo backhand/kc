@@ -2,3 +2,6 @@
 /kc
 /kc-linux-amd64
 /kc-darwin-*
+
+# goreleaser output
+/dist/

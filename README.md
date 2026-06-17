@@ -1,74 +1,105 @@
 # kc
 
-A keyboard-driven, Midnight-Commander-style CLI for daily Kubernetes
-operations. See [`SPEC.md`](./SPEC.md) for the design.
+**kc** — *kubernetes commander.* A keyboard-driven, Midnight-Commander-style
+terminal UI for daily Kubernetes **operations**: browse the cluster, then
+deploy, restart, scale, tail logs, and exec — all from the keyboard, with
+learned defaults so the common path is a couple of keystrokes.
 
-> **Status: read-only views (build order steps 1–3 done).** The data layer
-> (`internal/`: kubectl/gh/git shell-out + cache + learning store) and the TUI
-> (`internal/tui`: the all-namespaces → app-group → namespace → deployment →
-> pods zoom stack, with optimistic render-from-cache + background refresh) are
-> in. Still to come: **operations** (deploy/restart/logs/shell — step 4); the
-> footer reserves their key hints but they are inert. The archived Bun/OpenTUI
-> prototype is in [`../kc-bun`](../kc-bun/) (reference only).
->
-> Run it: `make build && KUBECONFIG=… ./kc` (or `KC_NO_ALTSCREEN=1 ./kc` to pipe
-> a linear render). In a git repo whose GHCR image runs on the cluster, kc opens
-> at that app's namespace; elsewhere it opens at all-namespaces.
+It's not another read-only dashboard: kc is built around *doing* things safely.
+Mutations (deploy / restart / scale) are confirm-gated; logs and exec hand the
+terminal to `kubectl`. See [`SPEC.md`](./SPEC.md) for the design.
 
-## Stack
+## Install
 
-- **Go** + the Charm TUI stack: [`bubbletea`](https://github.com/charmbracelet/bubbletea),
-  [`lipgloss`](https://github.com/charmbracelet/lipgloss),
-  [`bubbles`](https://github.com/charmbracelet/bubbles).
-- Requires **Go ≥ 1.24** (`go` directive in `go.mod`; the floor is set by the
-  test-only `teatest` helper — the shipped binary itself builds on older Go).
-- No cgo. The smoke test drives the app headlessly via `teatest`.
+### Homebrew (macOS / Linux)
 
-## Build
+```sh
+brew tap backhand/tap
+brew install kc
+# …or in one line:
+brew install backhand/tap/kc
+```
+
+### go install
+
+```sh
+go install github.com/backhand/kc@latest
+```
+
+### Build from source
+
+```sh
+git clone https://github.com/backhand/kc && cd kc
+make build      # -> ./kc  (static, no cgo)
+```
+
+**Runtime requirements:** `kubectl` (required — kc shells out to it for
+everything), plus `git` + `gh` for the deploy flow (it lists GitHub releases to
+pick a version). The Homebrew formula pulls in `kubernetes-cli` automatically.
+
+## Usage
+
+```sh
+kc            # launch the TUI against your current kube-context
+kc --version
+kc --help
+```
+
+kc uses the ambient `KUBECONFIG` / current context (so OIDC/Dex auth via
+`kubectl` works for free). Launched inside a git repo whose GHCR image runs on
+the cluster, it opens straight at that app's namespace; elsewhere it opens at
+all-namespaces. `KC_NO_ALTSCREEN=1 kc` renders a linear, pipeable stream.
+
+### Navigation — a zoom stack
+
+```
+all-namespaces  →  app-group  →  namespace  →  deployment  →  pods
+```
+
+Each level paints instantly from an on-disk cache and refreshes in the
+background, so it's never blocked on the apiserver.
+
+| Key            | Action                                  |
+| -------------- | --------------------------------------- |
+| `↑`/`k` `↓`/`j`| move the cursor                         |
+| `enter` / `→`  | drill in                                |
+| `backspace`/`←`/`h` | zoom out                           |
+| `/`            | search-everywhere (namespaces/deployments/pods) |
+| `q` / `Ctrl+C` | quit                                    |
+| `?`            | toggle help                             |
+
+### Operations (on the selected workload)
+
+| Key | Operation | Notes                                                       |
+| --- | --------- | ----------------------------------------------------------- |
+| `d` | deploy    | pick a release → `kubectl set image`; confirm-gated; learns presets |
+| `r` | restart   | `kubectl rollout restart` a set; confirm-gated              |
+| `s` | scale     | scale a set to N replicas (0 = pause); confirm-gated        |
+| `l` | logs      | stream `kubectl logs -f` for the selected deployment/pod    |
+| `e` | exec      | open a shell (`kubectl exec -it … -- sh`)                   |
+
+Deploy, restart, and scale share a **set selection** (checkboxes + learned
+preset chips): the set containing the workload you're on is pre-checked, `←`/`→`
+cycle presets, number keys toggle them, and `space` toggles individual rows. The
+pods list shows each pod's image version so you can watch a rollout flip live.
+
+## Development
 
 ```sh
 make build        # native static binary -> ./kc
 make build-small  # native, trimmed (-ldflags "-s -w")
-make linux        # Linux/amd64 static, ONE command
-make dist         # trimmed darwin + linux binaries
-make test         # headless render+input+exit smoke test
+make linux        # Linux/amd64 static, one command
+make test         # headless render+input+exit smoke test (teatest)
 ```
 
-Equivalent raw commands:
+- **Go** + the Charm stack (`bubbletea`, `lipgloss`, `bubbles`). Go ≥ 1.24.
+- No cgo; the binary is a small (~3–5 MB) static executable that cross-compiles
+  to Linux in one command.
+- Everything Kubernetes/git/GitHub-shaped is a shell-out (`kubectl`/`git`/`gh`)
+  behind the `internal/` packages; `internal/tui` is the Bubble Tea app.
 
-```sh
-# native static (no cgo)
-CGO_ENABLED=0 go build -o kc .
+Releases are automated with GoReleaser — see [`RELEASING.md`](./RELEASING.md).
 
-# native static, trimmed
-CGO_ENABLED=0 go build -ldflags "-s -w" -o kc .
+## License
 
-# Linux/amd64 static cross-compile — single command, no native packages
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o kc-linux-amd64 .
-```
-
-## Verified (spike acceptance)
-
-Built with Go 1.26.4 (darwin/arm64 host); pinned: `bubbletea v1.3.10`,
-`lipgloss v1.1.0`, `bubbles v1.0.0`.
-
-| Build                         | `file`                                    | Size  |
-| ----------------------------- | ----------------------------------------- | ----- |
-| native (`CGO_ENABLED=0`)      | Mach-O 64-bit arm64 (only libSystem/libresolv via `otool -L`) | 4.1 MB |
-| native `-s -w`                | Mach-O 64-bit arm64                        | 2.8 MB |
-| Linux/amd64 (`CGO_ENABLED=0`) | ELF 64-bit x86-64, **statically linked**   | 4.2 MB |
-| Linux/amd64 `-s -w`           | ELF 64-bit x86-64, statically linked, stripped | 2.8 MB |
-
-- **Portable:** copying only the binary to `/tmp` and running it under a
-  scrubbed env (no Go toolchain on `PATH`) renders correctly; `↑/↓` and `j/k`
-  navigate (clamped at both ends); `q` / `Ctrl+C` quit cleanly and the terminal
-  is restored (alt-screen entered on start, left on quit, cursor re-shown).
-- **Linux cross-compile is one command** — no fetching of native packages.
-
-## Keys
-
-| Key             | Action          |
-| --------------- | --------------- |
-| `↑` / `k`       | move up         |
-| `↓` / `j`       | move down       |
-| `q` / `Ctrl+C`  | quit            |
+[MIT](./LICENSE) © Frederik Hannibal

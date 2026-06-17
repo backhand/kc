@@ -26,12 +26,43 @@ import (
 	"github.com/backhand/kc/internal/tui"
 )
 
+// Build metadata, injected at release time by GoReleaser's ldflags
+// (-X main.version=… -X main.commit=… -X main.date=…). Defaults are for a plain
+// `go build` / `go install`.
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "--version", "-v", "version":
+			fmt.Printf("kc %s (commit %s, built %s)\n", version, commit, date)
+			return
+		case "--help", "-h", "help":
+			fmt.Print(usage)
+			return
+		}
+	}
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "kc: %v\n", err)
 		os.Exit(1)
 	}
 }
+
+const usage = `kc — keyboard-driven, Midnight-Commander-style Kubernetes operations TUI
+
+Usage:
+  kc             launch the TUI (uses the ambient KUBECONFIG / current context)
+  kc --version   print version
+  kc --help      print this help
+
+In a git repo whose GHCR image runs on the cluster, kc opens at that app's
+namespace; elsewhere it opens at all-namespaces. Set KC_NO_ALTSCREEN=1 for a
+linear (pipeable) render. Full docs: https://github.com/backhand/kc
+`
 
 func run() error {
 	ctx := context.Background()

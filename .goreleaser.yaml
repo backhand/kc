@@ -1,0 +1,91 @@
+# GoReleaser config for kc.
+#
+# On a pushed `v*` tag, .github/workflows/release.yml runs `goreleaser release`,
+# which builds cross-platform static binaries, publishes a GitHub release on
+# backhand/kc, and pushes/updates the Homebrew formula in backhand/homebrew-tap.
+#
+# Validate locally:  goreleaser check
+# Dry-run a build:   goreleaser build --snapshot --clean
+# Full local release (needs GITHUB_TOKEN + HOMEBREW_TAP_TOKEN): goreleaser release --clean
+version: 2
+
+project_name: kc
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: kc
+    main: .
+    binary: kc
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .Commit }}
+      - -X main.date={{ .Date }}
+
+archives:
+  - id: kc
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "Merge "
+
+# Homebrew cask (GoReleaser deprecated `brews`/formulae for binary CLIs in
+# favour of casks; casks ship the prebuilt binary and auto-strip the macOS
+# quarantine xattr so an unsigned binary still runs). Install stays
+# `brew install backhand/tap/kc`.
+homebrew_casks:
+  - name: kc
+    # The tap repo the cask is committed to. Needs a PAT in the release workflow
+    # (HOMEBREW_TAP_TOKEN) — the default GITHUB_TOKEN can't push to a different
+    # repo. See RELEASING.md.
+    repository:
+      owner: backhand
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Casks
+    homepage: "https://github.com/backhand/kc"
+    description: "Keyboard-driven, Midnight-Commander-style Kubernetes operations TUI"
+    license: "MIT"
+    commit_author:
+      name: goreleaser-bot
+      email: goreleaser@backhand.dk
+    # kc is a kubectl front-end; pull kubectl in so `brew install kc` just works.
+    dependencies:
+      - formula: kubernetes-cli
+    caveats: "kc also uses git and gh (GitHub CLI) for the deploy flow."
+    # The binary is unsigned: strip the macOS quarantine xattr on install so
+    # Gatekeeper doesn't block the first run (Homebrew quarantines cask downloads
+    # by default, and goreleaser adds no quarantine handling of its own).
+    hooks:
+      post:
+        install: |
+          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/kc"]
