@@ -3,12 +3,17 @@
 A keyboard-driven, Midnight-Commander-style CLI for daily Kubernetes
 operations. See [`SPEC.md`](./SPEC.md) for the design.
 
-> **Status: spike skeleton.** This is the de-risking spike for the Go + Bubble
-> Tea stack — it proves a small, static, portable binary with a one-command
-> Linux cross-compile. It contains **no kc features yet** (no kubectl/gh/git,
-> no views, no cache, no deploy); those land on top of this base per the build
-> order in `SPEC.md`. The archived Bun/OpenTUI prototype is in
-> [`../kc-bun`](../kc-bun/) (reference only).
+> **Status: read-only views (build order steps 1–3 done).** The data layer
+> (`internal/`: kubectl/gh/git shell-out + cache + learning store) and the TUI
+> (`internal/tui`: the all-namespaces → app-group → namespace → deployment →
+> pods zoom stack, with optimistic render-from-cache + background refresh) are
+> in. Still to come: **operations** (deploy/restart/logs/shell — step 4); the
+> footer reserves their key hints but they are inert. The archived Bun/OpenTUI
+> prototype is in [`../kc-bun`](../kc-bun/) (reference only).
+>
+> Run it: `make build && KUBECONFIG=… ./kc` (or `KC_NO_ALTSCREEN=1 ./kc` to pipe
+> a linear render). In a git repo whose GHCR image runs on the cluster, kc opens
+> at that app's namespace; elsewhere it opens at all-namespaces.
 
 ## Stack
 
