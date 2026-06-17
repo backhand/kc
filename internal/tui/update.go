@@ -46,6 +46,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case deployStepMsg:
 		return m.onDeployStep(msg), nil
+
+	case restartStepMsg:
+		return m.onRestartStep(msg), nil
+
+	case execFinishedMsg:
+		// A suspended logs/shell session returned (Ctrl-C / shell exit / spawn
+		// error). The TUI is already restored by tea.ExecProcess; trigger a fresh
+		// fetch of the visible level so any state change (e.g. restarted pods) is
+		// reflected promptly rather than waiting for the next tick.
+		top := m.top()
+		top.loading = true
+		return m, m.fetchFor(*top)
 	}
 	return m, nil
 }
@@ -65,6 +77,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.deployModal != nil {
 		return m.handleDeployKey(msg)
 	}
+	// The restart confirm modal likewise owns keys until dismissed (esc/enter).
+	if m.restartModal != nil {
+		return m.handleRestartKey(msg)
+	}
 
 	switch {
 	case key.Matches(msg, keys.Quit):
@@ -77,6 +93,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Deploy):
 		return m.openDeploy()
+
+	case key.Matches(msg, keys.Restart):
+		return m.openRestart()
+
+	case key.Matches(msg, keys.Logs):
+		return m.runLogs()
+
+	case key.Matches(msg, keys.Shell):
+		return m.runShell()
 
 	case key.Matches(msg, keys.Up):
 		m.moveCursor(-1)

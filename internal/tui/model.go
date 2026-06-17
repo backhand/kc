@@ -19,6 +19,7 @@
 package tui
 
 import (
+	"os/exec"
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -104,6 +105,11 @@ type Model struct {
 	// rendering until dismissed.
 	deployModal *deployState
 
+	// restartModal is the active restart confirm/rollout flow (the `r` op), or
+	// nil. Like deployModal it owns key handling + rendering while set. The
+	// confirm-gated `kubectl rollout restart` is the only mutation it fires.
+	restartModal *restartState
+
 	quitting bool
 }
 
@@ -132,11 +138,18 @@ type Deps struct {
 	// not launched in a repo — recording is then skipped).
 	App string
 
-	// Runner executes the deploy mutation (`kubectl set image` / `rollout
-	// status`). Nil = the real exec.Run shell-out (deploy.SetImage's default);
-	// tests inject a capture func to assert the constructed kubectl argv WITHOUT
-	// touching a cluster.
+	// Runner executes the mutating kubectl ops (deploy's `set image` / restart's
+	// `rollout restart` / the shared `rollout status`). Nil = the real exec.Run
+	// shell-out (the deploy package's default); tests inject a capture func to
+	// assert the constructed kubectl argv WITHOUT touching a cluster.
 	Runner deploy.Runner
+
+	// ExecHook, when set, intercepts the interactive/streaming op commands
+	// (logs/shell) instead of handing them to tea.ExecProcess. Tests inject it to
+	// capture the constructed *exec.Cmd (path+args) WITHOUT spawning kubectl —
+	// never opening a real shell or streaming `-f`. Nil in production (the ops
+	// then suspend the TUI and run on the real terminal).
+	ExecHook func(*exec.Cmd)
 
 	// Fetchers are the data-layer calls, injectable for tests. When nil, New
 	// falls back to the real internal/k8s + internal/resolve functions bound to

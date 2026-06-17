@@ -73,6 +73,9 @@ func (m Model) View() string {
 	if m.deployModal != nil {
 		return m.renderDeployModal()
 	}
+	if m.restartModal != nil {
+		return m.renderRestartModal()
+	}
 	top := *m.top()
 
 	var b strings.Builder
@@ -343,12 +346,10 @@ func (m Model) renderFooter(l level) string {
 		left = errStyle.Render("error: " + truncate(l.err, 60))
 	}
 
-	// Op-key hints: deploy is wired in a namespace/deployment view; r/L/s remain
-	// reserved (later steps).
-	ops := footerStyle.Render("[d]eploy [r]estart [L]ogs [s]hell")
-	if m.deployContextAvailable() {
-		ops = hintStyle.Render("[d]eploy") + footerStyle.Render(" [r]estart [L]ogs [s]hell")
-	}
+	// Op-key hints. All four contextual ops act on the selected workload: deploy
+	// from a namespace/deployment view; restart/logs/shell from a namespace or
+	// pods view. Available ops render bright, unavailable ones faint.
+	ops := m.renderOpHints()
 
 	return left + "    " + ops + "\n" + footerStyle.Render(hints)
 }

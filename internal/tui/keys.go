@@ -3,9 +3,9 @@ package tui
 import "github.com/charmbracelet/bubbles/key"
 
 // keyMap holds every binding so the help text (bubbles/help) stays in lockstep
-// with the actual handlers. Deploy ([d]) is wired (step 4); the r/l/s operation
-// keys are declared so they appear in the footer hint, but are NOT wired to any
-// handler — they remain reserved-inert (restart/logs/shell, later steps).
+// with the actual handlers. The contextual operation keys all act on the
+// workload selected in the current view — a deployment (namespace view) or a pod
+// (pods view): [d]eploy, [r]estart, [L]ogs, [s]hell (SPEC "Operations").
 type keyMap struct {
 	Up    key.Binding
 	Down  key.Binding
@@ -14,12 +14,11 @@ type keyMap struct {
 	Help  key.Binding
 	Quit  key.Binding
 
-	// Deploy ([d]) opens the deploy modal (step 4 — wired).
-	Deploy key.Binding
-	// Reserved operation hints (later steps — not handled yet).
-	Restart key.Binding
-	Logs    key.Binding
-	Shell   key.Binding
+	// Contextual operations on the selected workload.
+	Deploy  key.Binding // opens the deploy modal (confirm-gated mutation)
+	Restart key.Binding // `kubectl rollout restart` (confirm-gated mutation)
+	Logs    key.Binding // streams logs via tea.ExecProcess (read-only)
+	Shell   key.Binding // interactive shell via tea.ExecProcess
 
 	// Deploy-modal bindings. Space toggles the focused row's checkbox; Confirm
 	// advances a phase / fires the (confirm-gated) apply; Cancel backs out a

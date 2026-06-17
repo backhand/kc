@@ -33,6 +33,17 @@ func (c *captureRunner) run(_ context.Context, command string, args []string, op
 	return c.res, c.err
 }
 
+// contains reports whether ss includes want (used to assert a flag is/ isn't in
+// the constructed argv).
+func contains(ss []string, want string) bool {
+	for _, s := range ss {
+		if s == want {
+			return true
+		}
+	}
+	return false
+}
+
 // ── Pure argv builders ────────────────────────────────────────────────────────
 
 func TestContainerArg(t *testing.T) {
@@ -87,7 +98,24 @@ func TestRolloutStatusArgs(t *testing.T) {
 	}
 }
 
-// ── SetImage / RolloutStatus via mocked runner (NO cluster) ────────────────────
+func TestRolloutRestartArgs(t *testing.T) {
+	// No context, no dry-run.
+	got := RolloutRestartArgs(k8s.Options{}, "mailon", "responder", false)
+	want := []string{"-n", "mailon", "rollout", "restart", "deployment/responder"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("RolloutRestartArgs =\n  %v\nwant\n  %v", got, want)
+	}
+
+	// Dry-run appends --dry-run=server; context prepends --context (mirrors
+	// SetImageArgs' shape — the safe live touch the reviewer uses).
+	got = RolloutRestartArgs(k8s.Options{Context: "k3s"}, "mailon", "responder", true)
+	want = []string{"--context", "k3s", "-n", "mailon", "rollout", "restart", "deployment/responder", "--dry-run=server"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("dry-run+context RolloutRestartArgs =\n  %v\nwant\n  %v", got, want)
+	}
+}
+
+// ── SetImage / RolloutRestart / RolloutStatus via mocked runner (NO cluster) ───
 
 func TestSetImage_InvokesKubectlWithCorrectArgv(t *testing.T) {
 	cap := &captureRunner{res: exec.RunResult{Stdout: "deployment.apps/web image updated"}}
@@ -122,6 +150,48 @@ func TestSetImage_DryRunArgv(t *testing.T) {
 	}
 	got := cap.calls[0].args
 	want := []string{"-n", "mailon", "set", "image", "deployment/web", "*=img:tag", "--dry-run=server"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("dry-run argv =\n  %v\nwant\n  %v", got, want)
+	}
+}
+
+func TestRolloutRestart_InvokesKubectlWithCorrectArgv(t *testing.T) {
+	cap := &captureRunner{res: exec.RunResult{Stdout: "deployment.apps/responder restarted"}}
+	_, err := RolloutRestart(context.Background(), k8s.Options{Kubeconfig: "/tmp/kc"}, "mailon", "responder",
+		RestartOpts{Runner: cap.run})
+	if err != nil {
+		t.Fatalf("RolloutRestart: %v", err)
+	}
+	if len(cap.calls) != 1 {
+		t.Fatalf("expected 1 kubectl call, got %d", len(cap.calls))
+	}
+	c := cap.calls[0]
+	if c.command != "kubectl" {
+		t.Errorf("command = %q, want kubectl", c.command)
+	}
+	want := []string{"-n", "mailon", "rollout", "restart", "deployment/responder"}
+	if !reflect.DeepEqual(c.args, want) {
+		t.Errorf("argv =\n  %v\nwant\n  %v", c.args, want)
+	}
+	// Not a dry-run by default — the real restart.
+	if contains(c.args, "--dry-run=server") {
+		t.Error("default RolloutRestart must NOT be a dry-run")
+	}
+	// KUBECONFIG threaded into the exec env (same as SetImage).
+	if len(c.opts.Env) != 1 || c.opts.Env[0] != "KUBECONFIG=/tmp/kc" {
+		t.Errorf("env = %v, want [KUBECONFIG=/tmp/kc]", c.opts.Env)
+	}
+}
+
+func TestRolloutRestart_DryRunArgv(t *testing.T) {
+	cap := &captureRunner{}
+	_, err := RolloutRestart(context.Background(), k8s.Options{}, "mailon", "responder",
+		RestartOpts{DryRun: true, Runner: cap.run})
+	if err != nil {
+		t.Fatalf("RolloutRestart dry-run: %v", err)
+	}
+	got := cap.calls[0].args
+	want := []string{"-n", "mailon", "rollout", "restart", "deployment/responder", "--dry-run=server"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("dry-run argv =\n  %v\nwant\n  %v", got, want)
 	}

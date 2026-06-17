@@ -1,18 +1,19 @@
-// Package deploy holds the ONLY mutating code in kc: the imperative
-// `kubectl set image` that the confirm-gated deploy flow runs, plus the
-// `kubectl rollout status` it watches afterwards (SPEC "Deploy flow (v1)").
+// Package deploy holds the mutating code in kc: the imperative `kubectl set
+// image` that the confirm-gated deploy flow runs, the `kubectl rollout restart`
+// the restart op runs, plus the `kubectl rollout status` both watch afterwards
+// (SPEC "Deploy flow (v1)" / "Operations").
 //
 // Everything else in kc is read-only. This package is deliberately tiny and
 // isolated so the mutation surface is auditable in one place.
 //
-//   - The argv is built by the pure SetImageArgs / RolloutStatusArgs helpers, so
-//     the exact command can be asserted in a unit test (and dry-run-checked by a
-//     reviewer) without spawning anything.
+//   - The argv is built by the pure SetImageArgs / RolloutRestartArgs /
+//     RolloutStatusArgs helpers, so the exact command can be asserted in a unit
+//     test (and dry-run-checked by a reviewer) without spawning anything.
 //   - Execution goes through an injectable Runner (default: exec.Run) so headless
 //     tests capture the constructed argv WITHOUT hitting a cluster.
-//   - SetImage MUST support a server-side dry run (`--dry-run=server`): the deploy
-//     modal can validate a change against the apiserver as a no-op before the real
-//     apply.
+//   - The mutations (SetImage / RolloutRestart) support a server-side dry run
+//     (`--dry-run=server`): the modal can validate a change against the apiserver
+//     as a no-op before the real apply/restart.
 //
 // Release vX.Y.Z → image ghcr.io/<owner>/<app>:vX.Y.Z. v1 is imperative
 // `kubectl set image` (SPEC notes a later Kustomize-bump mode is pluggable).
@@ -63,6 +64,24 @@ type RolloutOpts struct {
 	Runner Runner
 }
 
+// RestartOpts configures a single RolloutRestart call. Mirrors SetImageOpts so
+// the restart op has the same dry-run + injectable-runner surface as deploy.
+type RestartOpts struct {
+	// DryRun, when true, appends `--dry-run=server` (mirroring SetImageOpts).
+	//
+	// CAVEAT: unlike `kubectl set image`, the `kubectl rollout restart`
+	// subcommand does NOT accept --dry-run in current kubectl (it errors
+	// "unknown flag: --dry-run"). The flag is supported here for argv symmetry
+	// with SetImage and forward-compatibility, but the confirm-gated UI flow runs
+	// the REAL restart (DryRun=false) — the confirm screen is the safety gate, not
+	// a server dry-run. Kept pure + unit-tested so the day kubectl supports it,
+	// the wiring is already correct.
+	DryRun bool
+	// Runner overrides the executor (tests inject a capture func). Nil = the real
+	// exec.Run shell-out.
+	Runner Runner
+}
+
 // ContainerArg returns the kubectl container token for `set image`: the given
 // container name, or AllContainers ("*") when the name is empty. Trimmed.
 func ContainerArg(container string) string {
@@ -86,6 +105,29 @@ func SetImageArgs(kopts k8s.Options, ns, deployment, container, image string, dr
 	args := contextArgs(kopts)
 	args = append(args, "-n", ns, "set", "image", "deployment/"+deployment,
 		ContainerArg(container)+"="+image)
+	if dryRun {
+		args = append(args, "--dry-run=server")
+	}
+	return args
+}
+
+// RolloutRestartArgs builds the kubectl argv for restarting a deployment — pure,
+// so the exact command is unit-testable. Mirrors SetImageArgs' shape (context
+// threaded, dry-run appended).
+//
+//	kubectl [--context <c>] -n <ns> rollout restart deployment/<deployment> \
+//	    [--dry-run=server]
+//
+// `rollout restart` bumps the pod-template's restartedAt annotation, which the
+// Deployment controller rolls out as a normal rolling update (so the existing
+// rollout-status view watches it exactly like a deploy).
+//
+// NOTE: the `--dry-run=server` branch exists for argv symmetry with SetImageArgs
+// (and is unit-tested), but current kubectl's `rollout restart` rejects the flag
+// — see RestartOpts.DryRun. The confirm-gated UI runs the real restart.
+func RolloutRestartArgs(kopts k8s.Options, ns, deployment string, dryRun bool) []string {
+	args := contextArgs(kopts)
+	args = append(args, "-n", ns, "rollout", "restart", "deployment/"+deployment)
 	if dryRun {
 		args = append(args, "--dry-run=server")
 	}
@@ -127,6 +169,24 @@ func SetImage(ctx context.Context, kopts k8s.Options, ns, deployment, container,
 		run = defaultRunner
 	}
 	args := SetImageArgs(kopts, ns, deployment, container, image, o.DryRun)
+	return run(ctx, "kubectl", args, runOpts(kopts))
+}
+
+// RolloutRestart runs `kubectl rollout restart` to restart a deployment's pods
+// (the `r` op — SPEC "Operations"). This is a real mutation (a no-op only when
+// o.DryRun is set): it bumps the pod template's restartedAt annotation and the
+// Deployment controller does a rolling restart, which the rollout view then
+// watches via RolloutStatus exactly like a deploy.
+//
+// Returns the captured kubectl output; an *exec.ExecError on failure. The
+// kubeconfig/context/timeout from kopts are threaded through exactly as SetImage
+// and the read-only wrappers do.
+func RolloutRestart(ctx context.Context, kopts k8s.Options, ns, deployment string, o RestartOpts) (exec.RunResult, error) {
+	run := o.Runner
+	if run == nil {
+		run = defaultRunner
+	}
+	args := RolloutRestartArgs(kopts, ns, deployment, o.DryRun)
 	return run(ctx, "kubectl", args, runOpts(kopts))
 }
 

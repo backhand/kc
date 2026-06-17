@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"context"
+	"strconv"
 	"sync"
 	"time"
 
@@ -223,6 +224,61 @@ func GetNamespace(ctx context.Context, ns string, opts Options) (NamespaceView, 
 	}
 	return NamespaceView{Namespace: ns, Kind: ClassifyNamespace(ns), Deployments: deps}, nil
 }
+
+// ── Interactive / streaming argv builders (logs, exec) ──────────────────────
+//
+// kc's logs (`L`) and shell (`s`) ops are NOT shell-outs that capture output:
+// they hand the terminal to a long-lived kubectl via tea.ExecProcess (suspend
+// the TUI → stream/interact → resume). So the data layer only owns the pure
+// argv assembly here (context threaded exactly like the read-only wrappers); the
+// TUI builds the *exec.Cmd (with the KUBECONFIG env from Options.runOpts) and
+// hands it to Bubble Tea. Pure → the exact argv is unit-testable without
+// spawning anything (SPEC: "Build all kubectl argv with pure functions").
+//
+// These are read-only / read-mostly: `logs` only reads; `exec -it -- sh` opens
+// an interactive session but is not a declarative mutation, so it stays out of
+// the mutating deploy package.
+
+// LogsArgs builds the kubectl argv for streaming logs — pure.
+//
+//	kubectl [--context <c>] -n <ns> logs <target> --all-containers --tail=<n> [-f]
+//
+// target is a kubectl resource reference, e.g. "pod/responder-aaa" or
+// "deployment/responder". --all-containers includes sidecars; tail bounds the
+// backlog; follow appends -f for a live stream (the TUI streams with follow,
+// a path-check probe omits it).
+func LogsArgs(opts Options, ns, target string, tail int, follow bool) []string {
+	args := opts.args("-n", ns, "logs", target, "--all-containers")
+	if tail >= 0 {
+		args = append(args, "--tail="+strconv.Itoa(tail))
+	}
+	if follow {
+		args = append(args, "-f")
+	}
+	return args
+}
+
+// ExecArgs builds the kubectl argv for an interactive shell into a pod — pure.
+//
+//	kubectl [--context <c>] -n <ns> exec -it <pod> -- <command…>
+//
+// command defaults to ["sh"] when empty (the canonical busybox/distroless-ish
+// fallback shell). -it allocates a TTY + keeps stdin open for an interactive
+// session; the TUI runs this via tea.ExecProcess so the real terminal is handed
+// to kubectl.
+func ExecArgs(opts Options, ns, pod string, command ...string) []string {
+	if len(command) == 0 {
+		command = []string{"sh"}
+	}
+	args := opts.args("-n", ns, "exec", "-it", pod, "--")
+	return append(args, command...)
+}
+
+// ExecOptions returns the exec.RunOptions (KUBECONFIG env + timeout) for a
+// kubectl invocation built from Options. Exposed so the TUI can thread the same
+// kubeconfig/context env into the *exec.Cmd it hands to tea.ExecProcess for the
+// streaming/interactive ops, matching the read-only wrappers.
+func (o Options) ExecOptions() exec.RunOptions { return o.runOpts() }
 
 // parallel runs fns concurrently and returns the first non-nil error (after all
 // have finished). A stdlib stand-in for the TS Promise.all fan-out — keeps the
