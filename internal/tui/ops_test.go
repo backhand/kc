@@ -99,72 +99,94 @@ func onResponderPods(t *testing.T, deps Deps) *teatest.TestModel {
 	return tm
 }
 
-// ── Restart (confirm-gated mutation) ──────────────────────────────────────────
+// ── Restart (confirm-gated mutation, set-based) ───────────────────────────────
+//
+// Restart now mirrors deploy's multi-select flow minus the version step:
+// select a SET → confirm → per-deployment rollout. These tests drive that flow
+// and assert `kubectl rollout restart` fires for EACH selected deployment via the
+// MOCKED runner — NEVER a real cluster.
 
-// TestRestart_NamespaceViewConfirmAndArgv is the safety-critical restart test:
-// `r` in the namespace view opens the confirm, enter fires the mutation, and we
-// assert the EXACT `kubectl rollout restart` argv via the mocked runner — NOT a
-// real cluster.
-func TestRestart_NamespaceViewConfirmAndArgv(t *testing.T) {
+// TestRestart_NamespaceViewSelectSetConfirmAndArgv is the safety-critical restart
+// test: `r` in the namespace view opens the SELECT phase with the focused
+// deployment's set preselected; we add the second deployment, confirm, and assert
+// the EXACT `kubectl rollout restart` (+ `rollout status` watch) argv fires for
+// EACH selected deployment via the mocked runner — NOT a real cluster.
+func TestRestart_NamespaceViewSelectSetConfirmAndArgv(t *testing.T) {
 	deps, runner, _, _ := opsHarness(t)
 	tm := onMailonNamespace(t, deps)
 
-	tm.Send(runeMsg('r')) // open restart confirm for the selected deployment (responder)
-	waitFor(t, tm, "restart — mailon", "will restart", "deployment/responder", "kubectl rollout restart")
+	tm.Send(runeMsg('r')) // open restart SELECT (responder preselected — focused, no history)
+	waitFor(t, tm, "restart — mailon", "select deployments to restart", "responder", "sender")
 
-	// Nothing has touched kubectl yet (confirm-gated).
+	// Nothing has touched kubectl yet (the select phase is pre-mutation).
+	if calls := runner.snapshot(); len(calls) != 0 {
+		t.Fatalf("kubectl invoked in the restart select phase: %v", calls)
+	}
+
+	// Add sender to the set (responder is already preselected), then confirm.
+	tm.Send(runeMsg('j')) // → sender row
+	tm.Send(spaceMsg())   // check sender (now {responder, sender})
+	tm.Send(enterMsg())   // → confirm
+	waitFor(t, tm, "confirm", "deployment/responder", "deployment/sender", "kubectl rollout restart")
+
+	// Still nothing run (confirm-gated).
 	if calls := runner.snapshot(); len(calls) != 0 {
 		t.Fatalf("kubectl invoked before restart confirm: %v", calls)
 	}
 
-	tm.Send(enterMsg()) // RESTART (confirm-gated mutation)
-	waitFor(t, tm, "rollout", "responder", "done")
+	tm.Send(enterMsg()) // RESTART (confirm-gated mutation) → per-deployment rollout
+	waitFor(t, tm, "rollout", "responder", "sender", "done")
 
 	tm.Send(escMsg()) // close
 	tm.Send(runeMsg('q'))
 	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 
-	// The restart mutation ran with the correct argv, then the rollout watch.
+	// `rollout restart` + `rollout status` fired for EACH selected deployment.
 	calls := runner.snapshot()
-	var restart, status []string
+	restart := map[string][]string{}
+	status := map[string][]string{}
 	for _, c := range calls {
+		target := restartTarget(c)
+		if target == "" {
+			continue
+		}
 		if contains2(c, "rollout") && contains2(c, "restart") {
-			restart = c
+			restart[target] = c
 		}
 		if contains2(c, "rollout") && contains2(c, "status") {
-			status = c
+			status[target] = c
 		}
 	}
-	if restart == nil {
-		t.Fatalf("no `rollout restart` call captured; calls=%v", calls)
-	}
-	wantRestart := []string{"--context", "k3s", "-n", "mailon", "rollout", "restart", "deployment/responder"}
-	if !reflect.DeepEqual(restart, wantRestart) {
-		t.Errorf("rollout restart argv =\n  %v\nwant\n  %v", restart, wantRestart)
-	}
-	// Crucially NOT a dry-run (the confirmed restart is real; the mocked runner
-	// guarantees no cluster hit — the reviewer dry-run-checks separately).
-	if contains2(restart, "--dry-run=server") {
-		t.Error("the confirmed restart must NOT be a dry-run")
-	}
-	if status == nil {
-		t.Fatalf("no `rollout status` watch captured; calls=%v", calls)
-	}
-	wantStatus := []string{"--context", "k3s", "-n", "mailon", "rollout", "status", "deployment/responder", "--timeout=5m0s"}
-	if !reflect.DeepEqual(status, wantStatus) {
-		t.Errorf("rollout status argv =\n  %v\nwant\n  %v", status, wantStatus)
+	for _, dep := range []string{"responder", "sender"} {
+		wantRestart := []string{"--context", "k3s", "-n", "mailon", "rollout", "restart", "deployment/" + dep}
+		if !reflect.DeepEqual(restart["deployment/"+dep], wantRestart) {
+			t.Errorf("rollout restart argv for %s =\n  %v\nwant\n  %v", dep, restart["deployment/"+dep], wantRestart)
+		}
+		// Crucially NOT a dry-run (the confirmed restart is real; the mocked runner
+		// guarantees no cluster hit — the reviewer dry-run-checks separately).
+		if contains2(restart["deployment/"+dep], "--dry-run=server") {
+			t.Errorf("the confirmed restart for %s must NOT be a dry-run", dep)
+		}
+		wantStatus := []string{"--context", "k3s", "-n", "mailon", "rollout", "status", "deployment/" + dep, "--timeout=5m0s"}
+		if !reflect.DeepEqual(status["deployment/"+dep], wantStatus) {
+			t.Errorf("rollout status argv for %s =\n  %v\nwant\n  %v", dep, status["deployment/"+dep], wantStatus)
+		}
 	}
 }
 
-// TestRestart_PodsViewTargetsParentDeployment asserts that `r` in the pods view
-// restarts the pod's PARENT deployment (not the pod), with the correct argv.
-func TestRestart_PodsViewTargetsParentDeployment(t *testing.T) {
+// TestRestart_PodsViewTargetsParentDeploymentSet asserts that `r` in the pods
+// view targets the pod's PARENT deployment's set (not the pod), with the correct
+// argv. The pods-view context uses the parent namespace's deployment list, and
+// the focused deployment (responder, the pods' parent) is preselected.
+func TestRestart_PodsViewTargetsParentDeploymentSet(t *testing.T) {
 	deps, runner, _, _ := opsHarness(t)
-	tm := onResponderPods(t, deps) // pods view, cursor on responder-aaa
+	tm := onResponderPods(t, deps) // pods view, cursor on responder-aaa (parent = responder)
 
-	tm.Send(runeMsg('r')) // restart → parent deployment "responder"
-	// Confirm prompt makes the pod → parent-deployment targeting explicit.
-	waitFor(t, tm, "restart — mailon", "responder-aaa", "deployment/responder")
+	tm.Send(runeMsg('r')) // restart → SELECT with responder (the parent) preselected
+	// The select screen makes the pod → parent-deployment focus explicit.
+	waitFor(t, tm, "restart — mailon", "select deployments to restart", "responder-aaa", "deployment/responder")
+	tm.Send(enterMsg()) // → confirm (just {responder})
+	waitFor(t, tm, "confirm", "deployment/responder")
 	tm.Send(enterMsg()) // RESTART
 	waitFor(t, tm, "rollout", "done")
 
@@ -184,25 +206,62 @@ func TestRestart_PodsViewTargetsParentDeployment(t *testing.T) {
 	}
 }
 
-// TestRestart_EscCancelsBeforeMutation asserts esc on the confirm closes the
-// modal WITHOUT running anything (defence-in-depth for the confirm gate).
-func TestRestart_EscCancelsBeforeMutation(t *testing.T) {
+// TestRestart_EscOnSelectCancelsBeforeMutation asserts esc on the SELECT phase
+// closes the modal WITHOUT running anything (the confirm-gate guarantee).
+func TestRestart_EscOnSelectCancelsBeforeMutation(t *testing.T) {
 	deps, runner, _, _ := opsHarness(t)
 	tm := onMailonNamespace(t, deps)
 
-	tm.Send(runeMsg('r')) // open restart confirm
-	waitFor(t, tm, "will restart", "deployment/responder")
-	tm.Send(escMsg()) // cancel → back to the namespace view
+	tm.Send(runeMsg('r')) // open restart SELECT
+	waitFor(t, tm, "select deployments to restart", "responder")
+	tm.Send(escMsg()) // cancel from select → back to the namespace view
 	waitFor(t, tm, "DEPLOYMENT", "mailon · [user]")
 
 	tm.Send(runeMsg('q'))
 	m := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second)).(Model)
 	if m.restartModal != nil {
-		t.Error("restart modal should be closed after esc")
+		t.Error("restart modal should be closed after esc on select")
 	}
 	if calls := runner.snapshot(); len(calls) != 0 {
 		t.Fatalf("esc must not run kubectl; calls=%v", calls)
 	}
+}
+
+// TestRestart_EscOnConfirmCancelsBeforeMutation asserts esc on the CONFIRM phase
+// steps back to select (reversible) and that confirming was never reached, so
+// NOTHING ran (defence-in-depth for the confirm gate).
+func TestRestart_EscOnConfirmCancelsBeforeMutation(t *testing.T) {
+	deps, runner, _, _ := opsHarness(t)
+	tm := onMailonNamespace(t, deps)
+
+	tm.Send(runeMsg('r')) // open restart SELECT (responder preselected)
+	waitFor(t, tm, "select deployments to restart")
+	tm.Send(enterMsg()) // → confirm
+	waitFor(t, tm, "confirm", "deployment/responder")
+	tm.Send(escMsg()) // back to select (still nothing run)
+	waitFor(t, tm, "select deployments to restart")
+
+	// kubectl must not have been touched on the way to confirm and back.
+	if calls := runner.snapshot(); len(calls) != 0 {
+		t.Fatalf("esc on confirm must not run kubectl; calls=%v", calls)
+	}
+
+	tm.Send(ctrlCMsg())
+	m := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second)).(Model)
+	if m.restartModal == nil || m.restartModal.phase != restartSelect {
+		t.Fatalf("expected to be back on the restart select phase, modal=%+v", m.restartModal)
+	}
+}
+
+// restartTarget returns the "deployment/<name>" argument of a kubectl call, or ""
+// when the call has none.
+func restartTarget(args []string) string {
+	for _, a := range args {
+		if strings.HasPrefix(a, "deployment/") {
+			return a
+		}
+	}
+	return ""
 }
 
 // ── Logs / shell (interactive, ExecProcess) ───────────────────────────────────

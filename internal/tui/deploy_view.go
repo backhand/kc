@@ -44,44 +44,12 @@ func (m Model) renderDeployModal() string {
 	return b.String()
 }
 
-// renderDeploySelect renders the deployment checkboxes + preset chips.
+// renderDeploySelect renders the deployment checkboxes + preset chips (shared
+// with restart's select phase via renderSelectList).
 func (m Model) renderDeploySelect(ds *deployState) string {
 	var b strings.Builder
 	b.WriteString(headerStyle.Render("select deployments to deploy") + "\n\n")
-
-	for i, d := range ds.deployments {
-		box := "[ ]"
-		if ds.checked[d.Name] {
-			box = checkOnStyle.Render("[x]")
-		}
-		marker := "  "
-		name := d.Name
-		ver := d.Image.Tag
-		if ver == "" {
-			ver = "—"
-		}
-		line := fmt.Sprintf("%s %-22s %s", box, truncate(name, 22), headerStyle.Render(ver))
-		if i == ds.selCursor {
-			marker = "› "
-			line = selectedStyle.Render(fmt.Sprintf("%s %-22s ", box, truncate(name, 22))) + headerStyle.Render(ver)
-		}
-		b.WriteString(marker + line + "\n")
-	}
-
-	// Preset chips (one-key toggles for learned deployment-sets).
-	if len(ds.presets) > 0 {
-		b.WriteString("\n" + headerStyle.Render("presets:") + " ")
-		chips := make([]string, 0, len(ds.presets))
-		for i, p := range ds.presets {
-			label := fmt.Sprintf("%d:%s", i+1, strings.Join(p, "+"))
-			style := chipStyle
-			if presetFullyChecked(ds, p) {
-				style = chipOnStyle
-			}
-			chips = append(chips, style.Render(label))
-		}
-		b.WriteString(strings.Join(chips, "  ") + "\n")
-	}
+	b.WriteString(renderSelectList(&ds.sel))
 
 	if !ds.repoOK {
 		b.WriteString("\n" + errStyle.Render("no ghcr.io image on these deployments — cannot list releases") + "\n")
@@ -95,7 +63,7 @@ func (m Model) renderDeploySelect(ds *deployState) string {
 // renderDeployVersions renders the annotated release list.
 func (m Model) renderDeployVersions(ds *deployState) string {
 	var b strings.Builder
-	sel := strings.Join(checkedNames(ds.checked), ", ")
+	sel := strings.Join(ds.sel.checkedNames(), ", ")
 	b.WriteString(headerStyle.Render("pick a version for: "+sel) + "\n\n")
 
 	if ds.releasesLoading && len(ds.releases) == 0 {
@@ -220,24 +188,4 @@ func (m Model) renderDeployRollout(ds *deployState) string {
 	}
 	b.WriteString("\n" + hint)
 	return b.String()
-}
-
-// presetFullyChecked reports whether every (existing) name in a preset is
-// currently checked — so a chip can render "active".
-func presetFullyChecked(ds *deployState, preset []string) bool {
-	existing := map[string]bool{}
-	for _, d := range ds.deployments {
-		existing[d.Name] = true
-	}
-	any := false
-	for _, name := range preset {
-		if !existing[name] {
-			continue
-		}
-		any = true
-		if !ds.checked[name] {
-			return false
-		}
-	}
-	return any
 }

@@ -169,12 +169,22 @@ func TestDeploy_OpensModal(t *testing.T) {
 	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 }
 
-// TestDeploy_TopPresetPreChecked seeds a learned preset and asserts it is
-// pre-checked when the modal opens (SPEC: "top learned preset pre-checked").
-func TestDeploy_TopPresetPreChecked(t *testing.T) {
+// TestDeploy_PresetContainingCurrentPreChecked seeds a learned preset that
+// CONTAINS the focused deployment and asserts it is pre-checked when the modal
+// opens (SPEC Feature 1: "pre-check the first preset containing the deployment
+// you're on"). The cursor lands on responder (row 0) in the mailon namespace, so
+// the [responder sender] preset is the one to preselect.
+func TestDeploy_PresetContainingCurrentPreChecked(t *testing.T) {
 	deps, _, hist := deployHarness(t)
-	// Record a deploy of just [sender] so it is the top preset.
-	if err := hist.RecordDeploy(store.Scope{Cluster: testCluster, App: "mailon"}, []string{"sender"}); err != nil {
+	scope := store.Scope{Cluster: testCluster, App: "mailon"}
+	// A [sender]-only preset (does NOT contain responder) recorded first, then the
+	// [responder sender] preset. Both rank as distinct presets; only the latter
+	// contains the focused deployment (responder), so it is the one preselected —
+	// even though it isn't necessarily presets[0].
+	if err := hist.RecordDeploy(scope, []string{"sender"}); err != nil {
+		t.Fatalf("seed preset: %v", err)
+	}
+	if err := hist.RecordDeploy(scope, []string{"responder", "sender"}); err != nil {
 		t.Fatalf("seed preset: %v", err)
 	}
 
@@ -185,18 +195,45 @@ func TestDeploy_TopPresetPreChecked(t *testing.T) {
 	if m.deployModal == nil {
 		t.Fatal("modal closed unexpectedly")
 	}
-	// sender pre-checked, responder not.
-	if !m.deployModal.checked["sender"] || m.deployModal.checked["responder"] {
-		t.Errorf("checked = %v, want only sender pre-checked (the top preset)", m.deployModal.checked)
+	// The [responder sender] set (the first preset CONTAINING responder) is
+	// pre-checked — both rows on.
+	if !m.deployModal.sel.checked["responder"] || !m.deployModal.sel.checked["sender"] {
+		t.Errorf("checked = %v, want responder+sender pre-checked (the preset containing the focused deployment)", m.deployModal.sel.checked)
 	}
-	// And the preset chip is rendered (the modal's own frame shows the chip with
-	// its active styling because the top preset is checked).
-	if len(m.deployModal.presets) == 0 || !reflect.DeepEqual(m.deployModal.presets[0], []string{"sender"}) {
-		t.Errorf("presets[0] = %v, want [sender]", m.deployModal.presets)
+	// The cursor starts on the focused deployment (responder, row 0).
+	if m.deployModal.sel.cursor != 0 {
+		t.Errorf("cursor = %d, want 0 (the focused responder row)", m.deployModal.sel.cursor)
 	}
 	m.quitting = false // View() blanks while quitting; render the real modal frame
-	if !strings.Contains(m.View(), "1:sender") {
+	if !strings.Contains(m.View(), "responder+sender") {
 		t.Errorf("modal view missing the preset chip; view=\n%s", m.View())
+	}
+}
+
+// TestDeploy_NoPresetContainsCurrentFallsBackToCurrent asserts that when NO
+// learned preset contains the focused deployment, deploy pre-checks just that
+// deployment (SPEC Feature 1 fallback: "{current}"). The cursor lands on
+// responder; the only preset is [sender], which doesn't contain it.
+func TestDeploy_NoPresetContainsCurrentFallsBackToCurrent(t *testing.T) {
+	deps, _, hist := deployHarness(t)
+	scope := store.Scope{Cluster: testCluster, App: "mailon"}
+	if err := hist.RecordDeploy(scope, []string{"sender"}); err != nil {
+		t.Fatalf("seed preset: %v", err)
+	}
+
+	tm := openModalOnMailon(t, deps)
+	tm.Send(ctrlCMsg())
+	m := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second)).(Model)
+	if m.deployModal == nil {
+		t.Fatal("modal closed unexpectedly")
+	}
+	// Just the focused deployment (responder) is pre-checked; sender is not.
+	if !m.deployModal.sel.checked["responder"] || m.deployModal.sel.checked["sender"] {
+		t.Errorf("checked = %v, want only responder (fallback to {current} when no preset contains it)", m.deployModal.sel.checked)
+	}
+	// The [sender] chip is still offered (it's a learned preset, just not preselected).
+	if len(m.deployModal.sel.presets) == 0 || !reflect.DeepEqual(m.deployModal.sel.presets[0], []string{"sender"}) {
+		t.Errorf("presets[0] = %v, want [sender]", m.deployModal.sel.presets)
 	}
 }
 
@@ -226,13 +263,13 @@ func TestDeploy_ToggleAndPresetChip(t *testing.T) {
 		t.Fatal("modal closed unexpectedly")
 	}
 	// Both chips were available (two distinct presets).
-	if len(m.deployModal.presets) != 2 {
-		t.Fatalf("presets = %v, want 2 (responder+sender, sender)", m.deployModal.presets)
+	if len(m.deployModal.sel.presets) != 2 {
+		t.Fatalf("presets = %v, want 2 (responder+sender, sender)", m.deployModal.sel.presets)
 	}
-	if m.deployModal.checked["responder"] {
+	if m.deployModal.sel.checked["responder"] {
 		t.Error("responder should be unchecked after space toggle")
 	}
-	if m.deployModal.checked["sender"] {
+	if m.deployModal.sel.checked["sender"] {
 		t.Error("sender should be unchecked after toggling its preset chip off")
 	}
 }
@@ -243,8 +280,8 @@ func TestDeploy_VersionListAnnotated(t *testing.T) {
 	deps, _, _ := deployHarness(t)
 	tm := openModalOnMailon(t, deps)
 
-	// responder is pre-checked? No history → nothing pre-checked, so check one.
-	tm.Send(spaceMsg()) // check responder (focused)
+	// No history → the focused deployment (responder) is pre-checked (SPEC
+	// Feature 1 fallback to {current}), so enter advances straight to versions.
 	tm.Send(enterMsg()) // → version phase
 
 	// The annotated list shows the tags + build/flags from fakeReleases.
@@ -260,7 +297,7 @@ func TestDeploy_VersionListPagesOlder(t *testing.T) {
 	deps, _, _ := deployHarness(t)
 	tm := openModalOnMailon(t, deps)
 
-	tm.Send(spaceMsg()) // check responder
+	// responder is pre-checked (no-history fallback to {current}).
 	tm.Send(enterMsg()) // → versions (page 0: v0.6.10 … v0.6.7)
 	waitFor(t, tm, "v0.6.10")
 	tm.Send(runeMsg('o')) // page back → older window (v0.6.6, v0.6.5)
@@ -276,7 +313,7 @@ func TestDeploy_ConfirmShowsFromTo(t *testing.T) {
 	deps, _, _ := deployHarness(t)
 	tm := openModalOnMailon(t, deps)
 
-	tm.Send(spaceMsg()) // check responder
+	// responder is pre-checked (no-history fallback to {current}).
 	tm.Send(enterMsg()) // → versions
 	waitFor(t, tm, "v0.6.10")
 	tm.Send(enterMsg()) // pick v0.6.10 (cursor 0) → confirm
@@ -303,7 +340,8 @@ func TestDeploy_ConfirmInvokesSetImageWithCorrectArgv(t *testing.T) {
 	deps, runner, hist := deployHarness(t)
 	tm := openModalOnMailon(t, deps)
 
-	tm.Send(spaceMsg()) // check responder (single-container → "*=")
+	// responder is pre-checked (no-history fallback to {current}; single-container
+	// → "*=").
 	tm.Send(enterMsg()) // → versions
 	waitFor(t, tm, "v0.6.10")
 	tm.Send(enterMsg()) // pick v0.6.10 → confirm
@@ -361,7 +399,8 @@ func TestDeploy_MultiSelectArgvBoth(t *testing.T) {
 	deps, runner, _ := deployHarness(t)
 	tm := openModalOnMailon(t, deps)
 
-	tm.Send(spaceMsg())   // check responder (cursor 0)
+	// responder is pre-checked (cursor 0, no-history fallback to {current}); add
+	// sender so BOTH are selected.
 	tm.Send(runeMsg('j')) // → sender
 	tm.Send(spaceMsg())   // check sender
 	tm.Send(enterMsg())   // → versions
@@ -415,7 +454,7 @@ func TestDeploy_EscFromVersionsGoesBack(t *testing.T) {
 	deps, _, _ := deployHarness(t)
 	tm := openModalOnMailon(t, deps)
 
-	tm.Send(spaceMsg()) // check responder
+	// responder is pre-checked (no-history fallback to {current}).
 	tm.Send(enterMsg()) // → versions
 	waitFor(t, tm, "pick a version")
 	tm.Send(escMsg()) // back to select
@@ -434,7 +473,7 @@ func TestDeploy_EscFromVersionsGoesBack(t *testing.T) {
 func TestDeploy_NoMutationBeforeConfirm(t *testing.T) {
 	deps, runner, _ := deployHarness(t)
 	tm := openModalOnMailon(t, deps)
-	tm.Send(spaceMsg()) // check responder
+	// responder is pre-checked (no-history fallback to {current}).
 	tm.Send(enterMsg()) // → versions
 	waitFor(t, tm, "v0.6.10")
 	tm.Send(enterMsg()) // → confirm (still NO apply yet)

@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"sort"
-
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -57,15 +55,9 @@ type deployState struct {
 	namespace string
 	phase     deployPhase
 
-	// Deployments in the namespace (with container names), in display order.
-	deployments []k8s.Deployment
-	// checked is the current selection, keyed by deployment name.
-	checked map[string]bool
-	// presets are the learned deployment-sets (most-likely first); the top one
-	// is pre-checked. Chips 1..len(presets) toggle a whole preset.
-	presets [][]string
-	// selCursor is the focused row in the select phase.
-	selCursor int
+	// sel is the shared deployment checkbox + preset model (the `select` phase);
+	// see selection.go. Deploy and restart share it.
+	sel selection
 
 	// repo / repoImage derived from the deployments' GHCR image (so deploy works
 	// even when kc wasn't launched from the repo). repoOK is false when no
@@ -95,9 +87,9 @@ type deployState struct {
 // (a namespace view, or a deployment view inside one). A no-op when there is no
 // namespace context, or no deployments to deploy.
 //
-// It seeds the selection from the top learned preset (intersected with the
-// deployments that actually exist), derives the release repo from the
-// deployments' GHCR image, and kicks off the release fetch.
+// It seeds the selection with the learned preset CONTAINING the deployment the
+// user is focused on (else just that deployment — see newSelection), derives the
+// release repo from the deployments' GHCR image, and kicks off the release fetch.
 func (m Model) openDeploy() (tea.Model, tea.Cmd) {
 	ns, deployments, ok := m.deployContext()
 	if !ok || len(deployments) == 0 {
@@ -105,10 +97,10 @@ func (m Model) openDeploy() (tea.Model, tea.Cmd) {
 	}
 
 	ds := &deployState{
-		namespace:   ns,
-		phase:       phaseSelect,
-		deployments: deployments,
-		checked:     map[string]bool{},
+		namespace: ns,
+		phase:     phaseSelect,
+		// Preselect the set containing the focused deployment (SPEC Feature 1).
+		sel: newSelection(deployments, m.deployPresets(ns, deployments), m.currentDeployment()),
 	}
 
 	// Derive the release repo from the running images (SPEC).
@@ -118,34 +110,33 @@ func (m Model) openDeploy() (tea.Model, tea.Cmd) {
 		ds.repoOK = true
 	}
 
-	// Learned presets, scoped cluster × app. Pre-check the top preset, keeping
-	// only names that still exist as deployments.
-	existing := map[string]bool{}
-	for _, d := range deployments {
-		existing[d.Name] = true
-	}
-	ds.presets = m.deployPresets(ns, deployments)
-	if len(ds.presets) > 0 {
-		for _, name := range ds.presets[0] {
-			if existing[name] {
-				ds.checked[name] = true
-			}
-		}
-	}
-	// Fallback: nothing learned (or the learned set no longer exists) → pre-check
-	// the focused row so the modal never opens with an empty selection when there
-	// is exactly one obvious choice. With multiple deployments and no history we
-	// leave it to the user (predict-then-confirm: no guess beats a bad guess).
-	if !anyChecked(ds.checked) && len(deployments) == 1 {
-		ds.checked[deployments[0].Name] = true
-	}
-
 	m.deployModal = ds
 	if ds.repoOK {
 		ds.releasesLoading = true
 		return m, m.fetchReleases(ds.repo, ds.repoImage, releaseLimit, 0)
 	}
 	return m, nil
+}
+
+// currentDeployment is the deployment the user is focused on, for preselecting
+// the deploy/restart set (SPEC Feature 1):
+//
+//   - namespace view (levelNamespace): the cursor-selected deployment.
+//   - pods view (levelDeployment): the deployment whose pods are shown.
+//
+// Empty elsewhere (the deploy/restart modals don't open from those views, so the
+// selection falls back to its top-preset behavior — a belt-and-suspenders guard).
+func (m Model) currentDeployment() string {
+	top := m.top()
+	switch top.kind {
+	case levelNamespace:
+		if dep, ok := m.selectedDeployment(*top); ok {
+			return dep
+		}
+	case levelDeployment:
+		return top.deployment
+	}
+	return ""
 }
 
 // deployContext returns the namespace + its deployments for the current view.
@@ -223,34 +214,16 @@ func (m Model) deploySelectKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Cancel):
 		m.deployModal = nil // close the modal
 		return m, nil
-	case key.Matches(msg, keys.Up):
-		if ds.selCursor > 0 {
-			ds.selCursor--
-		}
-		return m, nil
-	case key.Matches(msg, keys.Down):
-		if ds.selCursor < len(ds.deployments)-1 {
-			ds.selCursor++
-		}
-		return m, nil
-	case key.Matches(msg, keys.Toggle):
-		if ds.selCursor >= 0 && ds.selCursor < len(ds.deployments) {
-			name := ds.deployments[ds.selCursor].Name
-			ds.checked[name] = !ds.checked[name]
-		}
-		return m, nil
 	case key.Matches(msg, keys.Confirm):
 		// Advance to the version list — only with a selection and a derived repo.
-		if !anyChecked(ds.checked) || !ds.repoOK {
+		if !ds.sel.anyChecked() || !ds.repoOK {
 			return m, nil
 		}
 		ds.phase = phaseVersions
 		return m, nil
 	}
-	// Number keys 1..9 toggle a whole preset.
-	if n, ok := digitKey(msg); ok && n >= 1 && n <= len(ds.presets) {
-		togglePreset(ds, ds.presets[n-1])
-	}
+	// Shared select keys: ↑/↓ move, space toggles the row, 1-9 toggle a preset.
+	ds.sel.handleSelectKey(msg)
 	return m, nil
 }
 
@@ -284,7 +257,7 @@ func (m Model) deployVersionsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		tag := ds.releases[ds.relCursor].Tag
-		ds.changes = deploy.PlanChanges(ds.deployments, checkedNames(ds.checked), ds.repoImage, tag)
+		ds.changes = deploy.PlanChanges(ds.sel.deployments, ds.sel.checkedNames(), ds.repoImage, tag)
 		if len(ds.changes) == 0 {
 			return m, nil
 		}
@@ -395,49 +368,6 @@ func (m Model) onDeployStep(msg deployStepMsg) Model {
 }
 
 // ── small helpers ────────────────────────────────────────────────────────────
-
-func anyChecked(checked map[string]bool) bool {
-	for _, v := range checked {
-		if v {
-			return true
-		}
-	}
-	return false
-}
-
-// checkedNames returns the checked deployment names, sorted (stable plan).
-func checkedNames(checked map[string]bool) []string {
-	out := []string{}
-	for name, on := range checked {
-		if on {
-			out = append(out, name)
-		}
-	}
-	sort.Strings(out)
-	return out
-}
-
-// togglePreset toggles a whole preset: if every name in the preset is already
-// checked, uncheck them; otherwise check them all (so a chip is a single-key
-// "select this set"). Names no longer present are skipped.
-func togglePreset(ds *deployState, preset []string) {
-	existing := map[string]bool{}
-	for _, d := range ds.deployments {
-		existing[d.Name] = true
-	}
-	allOn := true
-	for _, name := range preset {
-		if existing[name] && !ds.checked[name] {
-			allOn = false
-			break
-		}
-	}
-	for _, name := range preset {
-		if existing[name] {
-			ds.checked[name] = !allOn
-		}
-	}
-}
 
 // digitKey returns the digit (1..9, and 0) a key message represents, if any.
 func digitKey(msg tea.KeyMsg) (int, bool) {

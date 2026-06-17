@@ -10,6 +10,7 @@ import (
 
 	"github.com/thinkpilot/infrastructure/tools/kc/internal/deploy"
 	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
+	"github.com/thinkpilot/infrastructure/tools/kc/internal/store"
 )
 
 // The contextual operations on the selected workload (SPEC "Operations"):
@@ -87,98 +88,195 @@ func (m Model) opContextAvailable() bool {
 	return ok
 }
 
-// ── Restart (confirm-gated mutation) ──────────────────────────────────────────
+// ── Restart (confirm-gated mutation, set-based) ───────────────────────────────
 
-// restartState drives the `r` op: a confirm screen (what will restart), then the
-// per-deployment rollout view (reusing rolloutLine / RolloutStatus). Held by
-// Model.restartModal; nil when closed.
+// restartPhase is one screen of the restart flow. Restart mirrors deploy's
+// multi-select flow MINUS the version step:
+//
+//	restartSelect  → deployment checkboxes + preset chips (the shared selection)
+//	restartConfirm → the selected set that will restart, confirm-gated
+//	restartRollout → per-deployment `kubectl rollout restart` + status watch
+type restartPhase int
+
+const (
+	restartSelect  restartPhase = iota // deployment checkboxes + preset chips
+	restartConfirm                     // selected-set summary, confirm-gated
+	restartRollout                     // per-deployment rollout status
+)
+
+// restartState drives the `r` op: select a SET (like deploy), confirm what will
+// restart, then the per-deployment rollout view (reusing rolloutLine /
+// RolloutStatus). Held by Model.restartModal; nil when closed.
 type restartState struct {
-	namespace  string
-	deployment string
-	// origin describes what the user selected (e.g. "pod/x → deployment/y") for
-	// the confirm prompt, so a pods-view restart makes the parent-deployment
-	// targeting explicit.
+	namespace string
+	phase     restartPhase
+
+	// sel is the shared deployment checkbox + preset model (selection.go) — the
+	// same piece deploy uses, so restart's select screen behaves identically.
+	sel selection
+	// origin describes what the user came from when opening from a pods view
+	// (e.g. "pod/x → deployment/y"), shown on the select screen so the
+	// pod → parent-deployment targeting is explicit. Empty from a namespace view.
 	origin string
 
-	confirmed bool        // gate: true once the user pressed enter to APPLY
-	rollout   rolloutLine // single-deployment rollout state (restart is one deployment)
+	// rollouts tracks per-deployment rollout state in the final phase (one line
+	// per restarted deployment, like deploy's rollouts).
+	rollouts []rolloutLine
+	// applied guards against re-firing the mutation if confirm is pressed twice.
+	applied bool
 }
 
-// openRestart opens the restart confirm modal for the current view's target. A
-// no-op outside a workload view. Restart is a MUTATION, so it is confirm-gated:
-// opening only shows what WILL restart — nothing runs until the confirm.
+// openRestart opens the restart modal for the current view's namespace + its
+// deployments — the SAME context as deploy (deployContext), including from a
+// pods view (the parent namespace's deployment list). A no-op outside a workload
+// view. Restart is a MUTATION, so it is confirm-gated: select → confirm → only
+// then does anything run.
+//
+// The set is preselected exactly like deploy (Feature 1): the first learned
+// preset containing the focused deployment, else just that deployment. Restart
+// shares DEPLOY's presets — see restartPresets.
 func (m Model) openRestart() (tea.Model, tea.Cmd) {
-	t, ok := m.opTarget()
-	if !ok {
+	ns, deployments, ok := m.deployContext()
+	if !ok || len(deployments) == 0 {
 		return m, nil
 	}
-	origin := "deployment/" + t.deployment
+	t, _ := m.opTarget() // for the pods-view origin line (parent-deployment targeting)
+	origin := ""
 	if t.pod != "" {
-		// Pods view: make the pod → parent-deployment restart explicit.
 		origin = "pod/" + t.pod + "  →  deployment/" + t.deployment
 	}
 	m.restartModal = &restartState{
-		namespace:  t.namespace,
-		deployment: t.deployment,
-		origin:     origin,
-		rollout:    rolloutLine{deployment: t.deployment, state: rolloutPending},
+		namespace: ns,
+		phase:     restartSelect,
+		sel:       newSelection(deployments, m.restartPresets(ns), m.currentDeployment()),
+		origin:    origin,
 	}
 	return m, nil
 }
 
-// handleRestartKey routes a key to the restart modal: enter confirms (firing the
-// mutation), esc backs out (before confirm) / closes (after). The user can never
-// get stuck — esc always closes.
+// restartPresets are the learned deployment-sets restart preselects from. We use
+// DEPLOY's presets (DeployPresets): they represent "sets deployed together",
+// which is exactly the set a user typically wants to restart together — and on a
+// fresh install restart has no history of its own yet. Restart STILL records its
+// own sets (recordRestart), so a "restart" history accrues for future use; we
+// just don't read it back yet to avoid a cold-start with no chips.
+func (m Model) restartPresets(ns string) [][]string {
+	if m.deps.History == nil {
+		return nil
+	}
+	return m.deps.History.DeployPresets(m.deployScope(ns))
+}
+
+// handleRestartKey routes a key to the active restart phase. esc backs out a
+// phase (and closes from the first), so the user can never get stuck.
 func (m Model) handleRestartKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	rs := m.restartModal
+	switch rs.phase {
+	case restartSelect:
+		return m.restartSelectKey(msg)
+	case restartConfirm:
+		return m.restartConfirmKey(msg)
+	case restartRollout:
+		return m.restartRolloutKey(msg)
+	}
+	return m, nil
+}
+
+func (m Model) restartSelectKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	rs := m.restartModal
 	switch {
 	case key.Matches(msg, keys.Cancel):
-		// Esc closes the modal (a restart already in flight continues server-side,
-		// mirroring the deploy rollout phase).
-		m.restartModal = nil
+		m.restartModal = nil // close the modal (nothing has run — pre-mutation)
 		return m, nil
 	case key.Matches(msg, keys.Confirm):
-		if rs.confirmed {
-			// Post-rollout: enter closes once settled; otherwise ignored so the
-			// rollout view stays up while it runs.
-			if rs.rollout.state == rolloutDone || rs.rollout.state == rolloutFailed {
-				m.restartModal = nil
-			}
+		if !rs.sel.anyChecked() {
 			return m, nil
 		}
-		// Confirm-gated APPLY: record (best-effort) + fire the restart+watch.
-		rs.confirmed = true
-		rs.rollout.state = rolloutRunning
-		m.recordRestart(rs)
-		return m, m.runRestart(rs.namespace, rs.deployment)
+		rs.phase = restartConfirm
+		return m, nil
+	}
+	// Shared select keys: ↑/↓ move, space toggles the row, 1-9 toggle a preset.
+	rs.sel.handleSelectKey(msg)
+	return m, nil
+}
+
+func (m Model) restartConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	rs := m.restartModal
+	switch {
+	case key.Matches(msg, keys.Cancel):
+		rs.phase = restartSelect // back to the checkboxes (still nothing has run)
+		return m, nil
+	case key.Matches(msg, keys.Confirm):
+		if rs.applied {
+			return m, nil // guard double-confirm
+		}
+		rs.applied = true
+		// Confirm-gated APPLY: record the restarted SET (learning) + fire one
+		// restart+watch per selected deployment.
+		names := rs.sel.checkedNames()
+		m.recordRestart(rs, names)
+		rs.phase = restartRollout
+		rs.rollouts = make([]rolloutLine, len(names))
+		for i, name := range names {
+			rs.rollouts[i] = rolloutLine{deployment: name, state: rolloutRunning}
+		}
+		cmds := make([]tea.Cmd, 0, len(names))
+		for _, name := range names {
+			cmds = append(cmds, m.runRestart(rs.namespace, name))
+		}
+		return m, tea.Batch(cmds...)
 	}
 	return m, nil
 }
 
-// onRestartStep folds the restart's apply+rollout result into the modal.
+func (m Model) restartRolloutKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	rs := m.restartModal
+	// esc/enter closes once everything settled; esc always closes (an in-flight
+	// restart continues server-side, mirroring the deploy rollout phase).
+	switch {
+	case key.Matches(msg, keys.Cancel), key.Matches(msg, keys.Confirm):
+		if rolloutSettled(rs.rollouts) || key.Matches(msg, keys.Cancel) {
+			m.restartModal = nil
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
+// onRestartStep folds one deployment's restart+rollout result into the modal.
 func (m Model) onRestartStep(msg restartStepMsg) Model {
 	rs := m.restartModal
-	if rs == nil || rs.deployment != msg.deployment {
+	if rs == nil {
 		return m
 	}
-	if msg.err != nil {
-		rs.rollout.state = rolloutFailed
-		rs.rollout.detail = msg.err.Error()
-	} else {
-		rs.rollout.state = rolloutDone
-		rs.rollout.detail = msg.detail
+	for i := range rs.rollouts {
+		if rs.rollouts[i].deployment != msg.deployment {
+			continue
+		}
+		if msg.err != nil {
+			rs.rollouts[i].state = rolloutFailed
+			rs.rollouts[i].detail = msg.err.Error()
+		} else {
+			rs.rollouts[i].state = rolloutDone
+			rs.rollouts[i].detail = msg.detail
+		}
 	}
 	return m
 }
 
-// recordRestart records the restart into the learning store (generic store, so
-// restart can grow predictive defaults later — SPEC). Best-effort; nil store /
-// not-in-a-repo simply skips. Scoped cluster × app exactly like deploy.
-func (m Model) recordRestart(rs *restartState) {
+// recordRestart records the restarted SET into the learning store under the same
+// shape deploy uses ({deployments: [...]}), so a "restart" history builds its own
+// presets over time (SPEC). Best-effort; nil store / not-in-a-repo simply skips.
+// Scoped cluster × app exactly like deploy.
+func (m Model) recordRestart(rs *restartState, names []string) {
 	if m.deps.History == nil {
 		return
 	}
-	_ = m.deps.History.Record("restart", m.deployScope(rs.namespace), nil)
+	arr := make([]any, len(names))
+	for i, s := range names {
+		arr[i] = s
+	}
+	_ = m.deps.History.Record("restart", m.deployScope(rs.namespace), store.Params{"deployments": arr})
 }
 
 // ── Logs / shell (interactive, via tea.ExecProcess) ───────────────────────────
