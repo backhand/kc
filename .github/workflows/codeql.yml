@@ -21,7 +21,7 @@ jobs:
       security-events: write # upload results to code scanning
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # Build with the go.mod version so autobuild doesn't trip on an old runner Go.
       - uses: actions/setup-go@v5
