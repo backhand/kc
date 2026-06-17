@@ -116,7 +116,7 @@ make linux        # Linux/amd64 static, one command
 make test         # headless render+input+exit smoke test (teatest)
 ```
 
-- **Go** + the Charm stack (`bubbletea`, `lipgloss`, `bubbles`). Go ≥ 1.24.
+- **Go** + the Charm stack (`bubbletea`, `lipgloss`, `bubbles`). Go ≥ 1.25.
 - No cgo; the binary is a small (~3–5 MB) static executable that cross-compiles
   to Linux in one command.
 - Everything Kubernetes/git/GitHub-shaped is a shell-out (`kubectl`/`git`/`gh`)

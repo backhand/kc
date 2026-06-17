@@ -1,6 +1,6 @@
 # kc — build targets
 #
-# Requires Go >= 1.24 (the go directive in go.mod; pinned by a test-only dep).
+# Requires Go >= 1.25 (the go directive in go.mod; raised by golang.org/x/sys).
 # The shipped binary depends only on the Charm libs (bubbletea/lipgloss/bubbles)
 # and the Go runtime — no cgo, no system libraries beyond the OS baseline.
 
