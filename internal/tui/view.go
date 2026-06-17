@@ -99,6 +99,9 @@ func (m Model) View() string {
 	if m.scaleModal != nil {
 		return m.renderScaleModal()
 	}
+	if m.searchModal != nil {
+		return m.renderSearchModal()
+	}
 	top := *m.top()
 
 	var b strings.Builder

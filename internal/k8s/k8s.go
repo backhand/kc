@@ -171,6 +171,45 @@ func GetAllDeployments(ctx context.Context, opts Options) ([]Deployment, error) 
 	return parseDeployments(deps.Items, pods.Items, rs.Items, nil), nil
 }
 
+// allResourceArgs is the pure argv for a cluster-wide `kubectl get <resource>`,
+// context threaded exactly like the read-only wrappers. Exposed so the exact
+// command is unit-testable without spawning kubectl (SPEC: "Build all kubectl
+// argv with pure functions") — GetAllPods uses it.
+func allResourceArgs(opts Options, resource string) []string {
+	return opts.args("get", resource, "--all-namespaces", "-o", "json")
+}
+
+// GetAllPodsArgs returns the kubectl argv GetAllPods issues for pods — pure.
+//
+//	kubectl [--context <c>] get pods --all-namespaces -o json
+//
+// Exposed for argv assertions in tests (the search-everywhere index's
+// cluster-wide pod fetch).
+func GetAllPodsArgs(opts Options) []string { return allResourceArgs(opts, "pods") }
+
+// GetAllPods returns every pod across every namespace in one call, each with its
+// owning Deployment resolved via the ReplicaSet ownerRef chain (`get pods` +
+// `get replicasets`, both --all-namespaces). It feeds the search-everywhere
+// index (jump to any pod cluster-wide). No metrics here — the index keys on
+// name/namespace/deployment only, and a per-namespace raw-metrics fan-out across
+// the whole cluster would be far too costly for a fast-open modal.
+func GetAllPods(ctx context.Context, opts Options) ([]Pod, error) {
+	var rs rawList[rawReplicaSet]
+	var pods rawList[rawPod]
+	err := parallel(
+		func() error {
+			return exec.RunJSON(ctx, "kubectl", GetAllPodsArgs(opts), opts.runOpts(), &pods)
+		},
+		func() error {
+			return kjson(ctx, opts, &rs, "get", "replicasets", "--all-namespaces", "-o", "json")
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return parsePods(pods.Items, rs.Items, nil), nil
+}
+
 // ── Aggregates ──────────────────────────────────────────────────────────
 
 // computeTotals sums node usage / capacity for the cluster header.

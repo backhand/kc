@@ -21,6 +21,10 @@ type keyMap struct {
 	Scale   key.Binding // opens the scale modal (confirm-gated mutation)
 	Shell   key.Binding // interactive exec/shell via tea.ExecProcess
 
+	// Search opens the search-everywhere modal (`/`): jump to any namespace /
+	// deployment / pod cluster-wide. Read-only navigation, not a mutation.
+	Search key.Binding
+
 	// Deploy-modal bindings. Space toggles the focused row's checkbox; Confirm
 	// advances a phase / fires the (confirm-gated) apply; Cancel backs out a
 	// phase or closes the modal. Older pages the version list back.
@@ -75,6 +79,10 @@ var keys = keyMap{
 		key.WithKeys("e"),
 		key.WithHelp("e", "exec"),
 	),
+	Search: key.NewBinding(
+		key.WithKeys("/"),
+		key.WithHelp("/", "search"),
+	),
 
 	// ── Deploy-modal bindings ──
 	Toggle: key.NewBinding(
@@ -106,13 +114,13 @@ var keys = keyMap{
 // ShortHelp / FullHelp implement help.KeyMap so bubbles/help can render the
 // footer. ShortHelp is the one-line strip; FullHelp is the `?` expansion.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Enter, k.Back, k.Quit}
+	return []key.Binding{k.Up, k.Down, k.Enter, k.Back, k.Search, k.Quit}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Enter, k.Back},
 		{k.Deploy, k.Restart, k.Logs, k.Scale, k.Shell},
-		{k.Help, k.Quit},
+		{k.Search, k.Help, k.Quit},
 	}
 }

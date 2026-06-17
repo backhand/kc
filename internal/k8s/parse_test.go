@@ -279,6 +279,39 @@ func TestParsePods_Fixture(t *testing.T) {
 	}
 }
 
+// TestGetAllPods_Composition asserts the parse composition GetAllPods relies on:
+// `parsePods(pods, replicasets, nil)` (no metrics — the cluster-wide pod fetch
+// for the search index skips them) still resolves every running pod's owning
+// Deployment via the ReplicaSet ownerRef chain, so each pod is addressable by a
+// (namespace, deployment) jump. This is GetAllPods minus the I/O (the wrapper is
+// the same parsePods call its argv test covers separately).
+func TestGetAllPods_Composition(t *testing.T) {
+	pods := loadFixture[rawList[rawPod]](t, "mailon-pods.json")
+	rs := loadFixture[rawList[rawReplicaSet]](t, "mailon-replicasets.json")
+
+	parsed := parsePods(pods.Items, rs.Items, nil) // nil metrics, exactly as GetAllPods
+	if len(parsed) == 0 {
+		t.Fatal("no pods parsed")
+	}
+	want := map[string]bool{"ingester": true, "knowledge": true, "responder": true, "sender": true, "web": true}
+	for _, p := range parsed {
+		// No metrics requested → never any usage (so search-index pod fetch is cheap).
+		if p.Usage != nil {
+			t.Errorf("pod %s has usage but GetAllPods passes nil metrics", p.Name)
+		}
+		if p.Phase == "Running" {
+			if p.Deployment == "" {
+				t.Errorf("running pod %s resolved to no deployment (not addressable by jump)", p.Name)
+			} else if !want[p.Deployment] {
+				t.Errorf("pod %s mapped to unexpected deployment %q", p.Name, p.Deployment)
+			}
+			if p.Namespace == "" {
+				t.Errorf("pod %s has no namespace", p.Name)
+			}
+		}
+	}
+}
+
 // ── Deployments + per-deployment usage rollup (fixture) ─────────────────────
 
 func TestParseDeployments_Fixture(t *testing.T) {

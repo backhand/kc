@@ -351,3 +351,58 @@ func (h *ActionHistory) DeployPresets(scope Scope) [][]string {
 	}
 	return out
 }
+
+// ── Search-history helpers ──────────────────────────────────────────────
+//
+// The search-everywhere modal (the `/` op) remembers past queries so an empty
+// field can offer the most-recent ones. Unlike deploy presets these are ranked
+// by pure RECENCY (newest first), not recency-weighted frequency — when you
+// reopen search you want what you last looked for, not your most-typed term.
+
+// RecordSearch records that the user ran a search for `query` (the query that
+// led somewhere — recorded when a result is selected). Stored as
+// Record("search", scope, {"q": query}); an empty/whitespace query is skipped
+// so blanks never enter the recents.
+func (h *ActionHistory) RecordSearch(scope Scope, query string) error {
+	q := strings.TrimSpace(query)
+	if q == "" {
+		return nil
+	}
+	return h.Record("search", scope, Params{"q": q})
+}
+
+// RecentSearches returns the n most-recent DISTINCT search queries for a scope,
+// newest first (recency — NOT the frequency-weighted Ranked). It walks the
+// scope's "search" records newest→oldest, collecting distinct non-empty queries
+// until it has n. n <= 0 returns nil.
+func (h *ActionHistory) RecentSearches(scope Scope, n int) []string {
+	if n <= 0 {
+		return nil
+	}
+	records := h.slice("search", scope) // oldest→newest
+	out := make([]string, 0, n)
+	seen := make(map[string]struct{})
+	for i := len(records) - 1; i >= 0; i-- {
+		raw, ok := records[i].Params["q"]
+		if !ok {
+			continue
+		}
+		q, ok := raw.(string)
+		if !ok {
+			continue
+		}
+		q = strings.TrimSpace(q)
+		if q == "" {
+			continue
+		}
+		if _, dup := seen[q]; dup {
+			continue
+		}
+		seen[q] = struct{}{}
+		out = append(out, q)
+		if len(out) >= n {
+			break
+		}
+	}
+	return out
+}

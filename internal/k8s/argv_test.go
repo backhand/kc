@@ -63,6 +63,23 @@ func TestExecArgs(t *testing.T) {
 	}
 }
 
+// TestGetAllPodsArgs asserts the EXACT cluster-wide pod argv the search-index
+// fetch issues: `kubectl [--context <c>] get pods --all-namespaces -o json`. The
+// context is threaded exactly like every other read-only wrapper.
+func TestGetAllPodsArgs(t *testing.T) {
+	got := GetAllPodsArgs(Options{})
+	want := []string{"get", "pods", "--all-namespaces", "-o", "json"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("GetAllPodsArgs (no context) =\n  %v\nwant\n  %v", got, want)
+	}
+
+	got = GetAllPodsArgs(Options{Context: "k3s"})
+	want = []string{"--context", "k3s", "get", "pods", "--all-namespaces", "-o", "json"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("GetAllPodsArgs (context) =\n  %v\nwant\n  %v", got, want)
+	}
+}
+
 func TestExecOptions_ThreadsKubeconfig(t *testing.T) {
 	ro := Options{Kubeconfig: "/tmp/kc", Timeout: 7 * time.Second}.ExecOptions()
 	if ro.Timeout != 7*time.Second {

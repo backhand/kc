@@ -236,6 +236,99 @@ func TestDeployPresets_RedeploySameSetRanksNotCounts(t *testing.T) {
 	}
 }
 
+// ── Search history (RecordSearch / RecentSearches) ───────────────────────────
+
+// TestRecentSearches_NewestFirstDistinct asserts recents come back newest-first,
+// de-duplicated (a re-searched query floats to the top), and capped at n.
+func TestRecentSearches_NewestFirstDistinct(t *testing.T) {
+	dir := t.TempDir()
+	clock := int64(1_700_000_000_000)
+	h := New(Options{BaseDir: dir, Now: func() int64 { return clock }})
+
+	// Record (oldest → newest), with a repeat of "responder" so distinctness +
+	// recency interact: the later occurrence must win its position.
+	for _, q := range []string{"web", "responder", "mailon", "responder", "sender"} {
+		clock += 1000
+		if err := h.RecordSearch(scope, q); err != nil {
+			t.Fatalf("RecordSearch(%q): %v", q, err)
+		}
+	}
+
+	// Newest-first, distinct: sender, responder (its LATEST occurrence), mailon, web.
+	got := h.RecentSearches(scope, 5)
+	want := []string{"sender", "responder", "mailon", "web"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("RecentSearches(5) = %v, want %v (newest-first, distinct)", got, want)
+	}
+
+	// Capped at n: the 2 newest distinct.
+	if got := h.RecentSearches(scope, 2); !reflect.DeepEqual(got, []string{"sender", "responder"}) {
+		t.Fatalf("RecentSearches(2) = %v, want [sender responder]", got)
+	}
+
+	// n <= 0 → nil.
+	if got := h.RecentSearches(scope, 0); got != nil {
+		t.Fatalf("RecentSearches(0) = %v, want nil", got)
+	}
+}
+
+// TestRecordSearch_SkipsEmptyAndTrims asserts a blank/whitespace query is never
+// recorded, and that queries are trimmed (so " web " and "web" are one entry).
+func TestRecordSearch_SkipsEmptyAndTrims(t *testing.T) {
+	dir := t.TempDir()
+	h := New(Options{BaseDir: dir})
+
+	if err := h.RecordSearch(scope, "   "); err != nil {
+		t.Fatalf("RecordSearch(blank): %v", err)
+	}
+	if err := h.RecordSearch(scope, ""); err != nil {
+		t.Fatalf("RecordSearch(empty): %v", err)
+	}
+	if got := h.RecentSearches(scope, 5); len(got) != 0 {
+		t.Fatalf("blank/empty queries should not be recorded; got %v", got)
+	}
+
+	_ = h.RecordSearch(scope, " web ")
+	_ = h.RecordSearch(scope, "web")
+	if got := h.RecentSearches(scope, 5); !reflect.DeepEqual(got, []string{"web"}) {
+		t.Fatalf("trimmed queries should dedup; got %v, want [web]", got)
+	}
+}
+
+// TestRecentSearches_ScopedPerCluster asserts search history is isolated by
+// scope (cluster × app) — a query under one scope never leaks into another.
+func TestRecentSearches_ScopedPerCluster(t *testing.T) {
+	dir := t.TempDir()
+	h := New(Options{BaseDir: dir})
+
+	a := Scope{Cluster: "alpha", App: ""}
+	b := Scope{Cluster: "beta", App: ""}
+	_ = h.RecordSearch(a, "alpha-query")
+	_ = h.RecordSearch(b, "beta-query")
+
+	if got := h.RecentSearches(a, 5); !reflect.DeepEqual(got, []string{"alpha-query"}) {
+		t.Fatalf("scope alpha = %v, want [alpha-query]", got)
+	}
+	if got := h.RecentSearches(b, 5); !reflect.DeepEqual(got, []string{"beta-query"}) {
+		t.Fatalf("scope beta = %v, want [beta-query]", got)
+	}
+}
+
+// TestRecordSearch_PersistsAcrossReload round-trips through disk: a fresh
+// ActionHistory over the same dir sees the recents (search uses the same
+// append-only store as deploy presets).
+func TestRecordSearch_PersistsAcrossReload(t *testing.T) {
+	dir := t.TempDir()
+	h := New(Options{BaseDir: dir})
+	_ = h.RecordSearch(scope, "web")
+	_ = h.RecordSearch(scope, "responder")
+
+	reloaded := New(Options{BaseDir: dir})
+	if got := reloaded.RecentSearches(scope, 5); !reflect.DeepEqual(got, []string{"responder", "web"}) {
+		t.Fatalf("after reload = %v, want [responder web]", got)
+	}
+}
+
 // ── Default half-life sanity (uses real DefaultHalfLife) ─────────────────────
 
 func TestRankParams_DefaultHalfLife(t *testing.T) {

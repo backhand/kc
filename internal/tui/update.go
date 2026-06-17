@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
 	"github.com/thinkpilot/infrastructure/tools/kc/internal/store"
 )
 
@@ -40,6 +41,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case allDeploymentsLoadedMsg:
 		return m.onAllDeploymentsLoaded(msg), nil
+
+	case allPodsLoadedMsg:
+		return m.onAllPodsLoaded(msg), nil
 
 	case releasesLoadedMsg:
 		return m.onReleasesLoaded(msg), nil
@@ -88,6 +92,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.scaleModal != nil {
 		return m.handleScaleKey(msg)
 	}
+	// The search modal owns keys until dismissed (esc closes); it must be checked
+	// AFTER the mutation modals so `/` can never open while one of those is up
+	// (they already own keys, including any `/` keystroke).
+	if m.searchModal != nil {
+		return m.handleSearchKey(msg)
+	}
 
 	switch {
 	case key.Matches(msg, keys.Quit):
@@ -97,6 +107,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Help):
 		m.showHelp = !m.showHelp
 		return m, nil
+
+	case key.Matches(msg, keys.Search):
+		return m.openSearch()
 
 	case key.Matches(msg, keys.Deploy):
 		return m.openDeploy()
@@ -287,12 +300,32 @@ func (m Model) onPodsLoaded(msg podsLoadedMsg) Model {
 		m.stack[i].pods = msg.pods
 		m.stack[i].loaded = true
 		m.stack[i].stamped = msg.at
+		// A search "jump to pod" stashed the target pod name on this level; land
+		// the cursor on it the moment its pods arrive, then clear the target so a
+		// later background refresh doesn't keep snapping the cursor back.
+		if m.stack[i].targetPod != "" {
+			if row, ok := podRowOf(m.stack[i].pods, m.stack[i].targetPod); ok {
+				m.stack[i].cursor = row
+			}
+			m.stack[i].targetPod = ""
+		}
 		m.clampCursor(&m.stack[i])
 	}
 	if msg.err == nil && m.deps.PodsCache != nil {
 		_ = m.deps.PodsCache.Put(m.podsKey(msg.namespace, msg.deployment), msg.pods)
 	}
 	return m
+}
+
+// podRowOf returns the row index of a pod by name within a pods slice. ok is
+// false when no pod matches (e.g. the searched-for pod has since been replaced).
+func podRowOf(pods []k8s.Pod, name string) (int, bool) {
+	for i, p := range pods {
+		if p.Name == name {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 func (m Model) onAllDeploymentsLoaded(msg allDeploymentsLoadedMsg) Model {

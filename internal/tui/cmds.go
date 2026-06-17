@@ -25,6 +25,10 @@ type Fetchers struct {
 	Namespace      func(ctx context.Context, ns string) (k8s.NamespaceView, error)
 	DeploymentPods func(ctx context.Context, ns, deployment string) ([]k8s.Pod, error)
 	AllDeployments func(ctx context.Context) ([]k8s.Deployment, error)
+	// AllPods fetches every pod cluster-wide (each with its owning Deployment
+	// resolved). Fired when the search modal opens so the `/` index can offer
+	// pods alongside the always-loaded namespaces + deployments.
+	AllPods func(ctx context.Context) ([]k8s.Pod, error)
 	// Releases fetches the latest annotated releases for a repo (deploy modal's
 	// version list). limit is how many to return; image is the GHCR image to
 	// probe availability against.
@@ -45,6 +49,9 @@ func realFetchers(opts k8s.Options) Fetchers {
 		},
 		AllDeployments: func(ctx context.Context) ([]k8s.Deployment, error) {
 			return k8s.GetAllDeployments(ctx, opts)
+		},
+		AllPods: func(ctx context.Context) ([]k8s.Pod, error) {
+			return k8s.GetAllPods(ctx, opts)
 		},
 		Releases: func(ctx context.Context, repo git.RepoRef, image string, limit int) []github.ReleaseAnnotation {
 			return github.GetReleases(ctx, repo, github.Options{Limit: limit, GHCRImage: image})
@@ -90,6 +97,15 @@ type allDeploymentsLoadedMsg struct {
 	deployments []k8s.Deployment
 	at          time.Time
 	err         error
+}
+
+// allPodsLoadedMsg carries every pod cluster-wide; the search modal merges these
+// into its index when they land (namespaces + deployments are indexed
+// immediately on open; pods join when this arrives).
+type allPodsLoadedMsg struct {
+	pods []k8s.Pod
+	at   time.Time
+	err  error
 }
 
 // releasesLoadedMsg carries the deploy modal's annotated release list for a
@@ -160,6 +176,24 @@ func (m Model) fetchAllDeployments() tea.Cmd {
 		defer cancel()
 		deps, err := f(ctx)
 		return allDeploymentsLoadedMsg{deployments: deps, at: time.Now(), err: err}
+	}
+}
+
+// fetchAllPods fetches every pod cluster-wide for the search index. Fired when
+// the search modal opens (not on launch — the index needs them only while the
+// modal is up). nil when no AllPods fetcher is wired (a partial Fetchers in a
+// test that does not exercise pod results), so the modal still indexes
+// namespaces + deployments.
+func (m Model) fetchAllPods() tea.Cmd {
+	f := m.deps.Fetch.AllPods
+	if f == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+		defer cancel()
+		pods, err := f(ctx)
+		return allPodsLoadedMsg{pods: pods, at: time.Now(), err: err}
 	}
 }
 

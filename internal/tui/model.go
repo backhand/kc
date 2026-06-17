@@ -65,6 +65,12 @@ type level struct {
 	namespace  string   // levelNamespace / levelDeployment
 	deployment string   // levelDeployment
 
+	// targetPod is a pod name to select once this deployment level's pods load
+	// (levelDeployment only). Set when the level is pushed by a search "jump to
+	// pod" so the cursor lands on the searched-for pod the moment pods arrive;
+	// onPodsLoaded consumes and clears it. Empty for the normal drill-in path.
+	targetPod string
+
 	cursor int
 	offset int // viewport scroll offset (first visible row)
 
@@ -115,6 +121,12 @@ type Model struct {
 	// `kubectl scale --replicas=N` (per checked deployment) is the only mutation
 	// it fires.
 	scaleModal *scaleState
+
+	// searchModal is the active search-everywhere flow (the `/` op), or nil. Like
+	// the other modals it owns key handling + rendering while set. It is
+	// read-only: selecting a result rebuilds the zoom stack to jump there (no
+	// mutation). It cannot open while a deploy/restart/scale modal is up.
+	searchModal *searchState
 
 	quitting bool
 }
