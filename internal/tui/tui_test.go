@@ -131,12 +131,17 @@ func mailonNamespaceView() k8s.NamespaceView {
 }
 
 func responderPods() []k8s.Pod {
+	// A mid-rollout snapshot: the two pods carry distinct image tags (the new
+	// v0.6.10 and the old v0.6.9), so the pods view's VERSION column shows the
+	// rollout progressing live.
 	return []k8s.Pod{
 		{Namespace: "mailon", Name: "responder-aaa", Deployment: "responder", Phase: "Running",
 			Ready: true, Node: "agent-0", Restarts: 0,
+			Image: k8s.ImageRef{Name: "responder", Repository: "ghcr.io/thinkpilot/mailon", Tag: "v0.6.10", Raw: "ghcr.io/thinkpilot/mailon:v0.6.10"},
 			Usage: &k8s.Usage{CPUMillicores: 75, MemoryBytes: 128 << 20}},
 		{Namespace: "mailon", Name: "responder-bbb", Deployment: "responder", Phase: "Running",
-			Ready: true, Node: "agent-0", Restarts: 3},
+			Ready: true, Node: "agent-0", Restarts: 3,
+			Image: k8s.ImageRef{Name: "responder", Repository: "ghcr.io/thinkpilot/mailon", Tag: "v0.6.9", Raw: "ghcr.io/thinkpilot/mailon:v0.6.9"}},
 	}
 }
 
@@ -286,6 +291,56 @@ func TestNavigationZoomStack(t *testing.T) {
 	}
 	if len(final.stack) != 1 || final.top().kind != levelOverview {
 		t.Fatalf("expected to end on the overview root; stack depth=%d", len(final.stack))
+	}
+}
+
+// TestPodsViewShowsImageVersionColumn drills into the responder pods view and
+// asserts the pod rows carry a VERSION column (the pod's image tag) as the last
+// column — so a rollout can be watched live. The responderPods fixture is a
+// mid-rollout snapshot (v0.6.10 + v0.6.9), so BOTH tags must appear under a
+// VERSION header.
+func TestPodsViewShowsImageVersionColumn(t *testing.T) {
+	h := newHarness(t, defaultFetchers())
+	tm := teatest.NewTestModel(t, New(h.deps), teatest.WithInitialTermSize(120, 30))
+	waitFor(t, tm, "mailon", "all-namespaces")
+	tm.Send(keyMsg(tea.KeyEnter)) // → namespace view
+	waitFor(t, tm, "responder", "DEPLOYMENT")
+	tm.Send(keyMsg(tea.KeyEnter)) // → responder pods view
+	// The VERSION header + both rollout tags appear in the pods view.
+	waitFor(t, tm, "POD", "VERSION", "responder-aaa", "v0.6.10", "v0.6.9")
+
+	tm.Send(runeMsg('q'))
+	fm := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second))
+	m := fm.(Model)
+	m.quitting = false // View() blanks while quitting; render the real frame
+
+	// Assert structurally: VERSION is the LAST column header, and the v0.6.10 tag
+	// appears at/after the VERSION column on the responder-aaa row.
+	frame := stripANSI(m.View())
+	lines := strings.Split(frame, "\n")
+	var head, podLine string
+	for _, ln := range lines {
+		if strings.Contains(ln, "POD") && strings.Contains(ln, "VERSION") {
+			head = ln
+		}
+		if strings.Contains(ln, "responder-aaa") {
+			podLine = ln
+		}
+	}
+	if head == "" {
+		t.Fatalf("no pods column header with POD+VERSION in frame:\n%s", frame)
+	}
+	if podLine == "" {
+		t.Fatalf("no responder-aaa pod row in frame:\n%s", frame)
+	}
+	// VERSION is the final column: nothing but spaces follow it in the header.
+	verCol := strings.Index(head, "VERSION")
+	if rest := strings.TrimSpace(head[verCol+len("VERSION"):]); rest != "" {
+		t.Errorf("VERSION must be the last column; header tail = %q", rest)
+	}
+	// The new tag renders on/after the VERSION column of the pod row.
+	if got := strings.Index(podLine, "v0.6.10"); got < verCol {
+		t.Errorf("v0.6.10 at col %d, want at/after VERSION col %d on row %q", got, verCol, podLine)
 	}
 }
 

@@ -438,7 +438,10 @@ func (m Model) namespaceRows(l level) (string, []row) {
 }
 
 func (m Model) podRows(l level) (string, []row) {
-	head := fmt.Sprintf("  %-34s %-10s %-22s %-4s %s", "POD", "STATUS", "NODE", "RST", "USAGE")
+	// VERSION (the pod's image tag) is the last column so a rollout can be watched
+	// live — old pods show the old tag, new pods the new (the view refreshes every
+	// 5s). NODE is tightened to 18 so the extra column fits a normal terminal.
+	head := fmt.Sprintf("  %-34s %-10s %-18s %-4s %-12s %s", "POD", "STATUS", "NODE", "RST", "USAGE", "VERSION")
 	out := make([]row, 0, len(l.pods))
 	for _, p := range l.pods {
 		status := p.Phase
@@ -449,8 +452,12 @@ func (m Model) podRows(l level) (string, []row) {
 		if node == "" {
 			node = "—"
 		}
-		text := fmt.Sprintf("%-34s %-10s %-22s %-4d %s",
-			truncate(p.Name, 34), truncate(status, 10), truncate(node, 22), p.Restarts, usageCell(p.Usage))
+		ver := p.Image.Tag
+		if ver == "" {
+			ver = "—"
+		}
+		text := fmt.Sprintf("%-34s %-10s %-18s %-4d %-12s %s",
+			truncate(p.Name, 34), truncate(status, 10), truncate(node, 18), p.Restarts, usageCell(p.Usage), truncate(ver, 16))
 		out = append(out, row{text: text})
 	}
 	return head, out

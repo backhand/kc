@@ -43,7 +43,7 @@ func (m Model) renderScaleSelect(ss *scaleState) string {
 	if ss.origin != "" {
 		b.WriteString("\n" + headerStyle.Render("from: ") + lipgloss.NewStyle().Foreground(accent).Render(ss.origin) + "\n")
 	}
-	hint := "space toggle · 1-9 preset · enter replicas › · esc cancel"
+	hint := "space toggle · 1-9 preset · ←/→ preset · enter replicas › · esc cancel"
 	b.WriteString("\n" + footerStyle.Render(hint))
 	return b.String()
 }

@@ -168,6 +168,28 @@ func ParseImage(raw string) ImageRef {
 	return ImageRef{Raw: raw, Repository: nameAndTag, Tag: "", Digest: digest}
 }
 
+// parseContainerImages parses a container-spec list into ImageRefs, in spec
+// order, each carrying its owning container name (for `set image <name>=…`).
+func parseContainerImages(containers []rawContainer) []ImageRef {
+	images := make([]ImageRef, 0, len(containers))
+	for _, c := range containers {
+		ref := ParseImage(c.Image)
+		ref.Name = c.Name // owning container name
+		images = append(images, ref)
+	}
+	return images
+}
+
+// primaryImage is the primary container's image (the first in spec order), the
+// SAME selection deployments and the pods view share. A zero ImageRef when there
+// are no containers.
+func primaryImage(images []ImageRef) ImageRef {
+	if len(images) > 0 {
+		return images[0]
+	}
+	return ImageRef{}
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Namespace classification
 // ─────────────────────────────────────────────────────────────────────────
@@ -372,6 +394,7 @@ func parsePods(pods []rawPod, replicaSets []rawReplicaSet, metrics []rawPodMetri
 		var statuses []rawContainerStatus
 		phase := "Unknown"
 		node := ""
+		var image ImageRef
 		if p.Status != nil {
 			statuses = p.Status.ContainerStatuses
 			if p.Status.Phase != "" {
@@ -380,6 +403,9 @@ func parsePods(pods []rawPod, replicaSets []rawReplicaSet, metrics []rawPodMetri
 		}
 		if p.Spec != nil {
 			node = p.Spec.NodeName
+			// Primary container's image — same selection deployments use — so the
+			// pods view can show the running tag (watch a rollout live).
+			image = primaryImage(parseContainerImages(p.Spec.Containers))
 		}
 
 		restarts := 0
@@ -400,6 +426,7 @@ func parsePods(pods []rawPod, replicaSets []rawReplicaSet, metrics []rawPodMetri
 			Namespace:  p.Metadata.Namespace,
 			Name:       p.Metadata.Name,
 			Deployment: podToDeploy[p.Metadata.Name],
+			Image:      image,
 			Phase:      phase,
 			Ready:      ready,
 			Node:       node,
@@ -473,16 +500,8 @@ func parseDeployments(deployments []rawDeployment, pods []rawPod, replicaSets []
 				containers = d.Spec.Template.Spec.Containers
 			}
 		}
-		images := make([]ImageRef, 0, len(containers))
-		for _, c := range containers {
-			ref := ParseImage(c.Image)
-			ref.Name = c.Name // owning container name (for `set image <name>=…`)
-			images = append(images, ref)
-		}
-		primary := ImageRef{}
-		if len(images) > 0 {
-			primary = images[0]
-		}
+		images := parseContainerImages(containers)
+		primary := primaryImage(images)
 		ready := 0
 		if d.Status != nil {
 			ready = d.Status.ReadyReplicas

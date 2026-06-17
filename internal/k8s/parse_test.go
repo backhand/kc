@@ -277,6 +277,74 @@ func TestParsePods_Fixture(t *testing.T) {
 	if withUsage != len(metrics.Items) {
 		t.Errorf("%d pods with usage, want %d (metric count)", withUsage, len(metrics.Items))
 	}
+
+	// Each pod carries its primary container's parsed image — the SAME
+	// primary-container selection deployments use (first container in spec order)
+	// — so the pods view can show the running tag (watch a rollout live). Every
+	// fixture pod runs the mailon image; the fixture is a mid-rollout snapshot, so
+	// web pods straddle two tags (v0.6.9 new, v0.6.6 old) — exactly the live signal
+	// the VERSION column surfaces.
+	webTags := map[string]bool{}
+	for _, p := range parsed {
+		if p.Image.Repository != "ghcr.io/thinkpilot/mailon" {
+			t.Errorf("pod %s image repo = %q, want ghcr.io/thinkpilot/mailon", p.Name, p.Image.Repository)
+		}
+		if p.Image.Tag == "" {
+			t.Errorf("pod %s image tag empty, want a parsed tag", p.Name)
+		}
+		if p.Image.Name != p.Deployment {
+			// fixture deployments are single-container, named after the deployment.
+			t.Errorf("pod %s image container name = %q, want %q (the primary container)", p.Name, p.Image.Name, p.Deployment)
+		}
+		if strings.HasPrefix(p.Name, "web-") {
+			webTags[p.Image.Tag] = true
+		}
+	}
+	if !webTags["v0.6.9"] || !webTags["v0.6.6"] {
+		t.Errorf("web pod tags = %v, want both v0.6.9 (new) and v0.6.6 (old) — the per-pod tag is what drives the live-rollout view", webTags)
+	}
+}
+
+// TestParsePods_PrimaryImageSelection asserts the pod's Image is the FIRST
+// container in spec order (the same "primary" selection deployments use), even
+// when a sidecar follows. Built from a synthetic raw pod so the multi-container
+// ordering is explicit (the live fixtures are single-container).
+func TestParsePods_PrimaryImageSelection(t *testing.T) {
+	raw := rawPod{}
+	raw.Metadata.Name = "multi"
+	raw.Metadata.Namespace = "mailon"
+	raw.Spec = &struct {
+		NodeName   string         `json:"nodeName"`
+		Containers []rawContainer `json:"containers"`
+	}{
+		NodeName: "agent-0",
+		Containers: []rawContainer{
+			{Name: "app", Image: "ghcr.io/thinkpilot/mailon:v1.2.3"},
+			{Name: "sidecar", Image: "ghcr.io/thinkpilot/proxy:v9.9.9"},
+		},
+	}
+	parsed := parsePods([]rawPod{raw}, nil, nil)
+	if len(parsed) != 1 {
+		t.Fatalf("got %d pods, want 1", len(parsed))
+	}
+	got := parsed[0].Image
+	if got.Repository != "ghcr.io/thinkpilot/mailon" || got.Tag != "v1.2.3" || got.Name != "app" {
+		t.Errorf("primary image = %+v, want the first container (app, mailon:v1.2.3)", got)
+	}
+}
+
+// TestParsePods_NoContainersZeroImage asserts a pod with no container spec gets a
+// zero ImageRef (so the view renders the "—" fallback rather than crashing).
+func TestParsePods_NoContainersZeroImage(t *testing.T) {
+	raw := rawPod{}
+	raw.Metadata.Name = "bare"
+	parsed := parsePods([]rawPod{raw}, nil, nil)
+	if len(parsed) != 1 {
+		t.Fatalf("got %d pods, want 1", len(parsed))
+	}
+	if (parsed[0].Image != ImageRef{}) {
+		t.Errorf("bare pod image = %+v, want zero ImageRef", parsed[0].Image)
+	}
 }
 
 // TestGetAllPods_Composition asserts the parse composition GetAllPods relies on:

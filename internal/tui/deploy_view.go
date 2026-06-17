@@ -15,10 +15,13 @@ import (
 // and the per-deployment rollout view. Styling reuses view.go's palette.
 
 var (
-	chipStyle    = lipgloss.NewStyle().Foreground(accent)
-	chipOnStyle  = lipgloss.NewStyle().Foreground(good).Bold(true)
-	preStyle     = lipgloss.NewStyle().Foreground(warn) // pre-release flag
-	checkOnStyle = lipgloss.NewStyle().Foreground(good).Bold(true)
+	chipStyle   = lipgloss.NewStyle().Foreground(accent)
+	chipOnStyle = lipgloss.NewStyle().Foreground(good).Bold(true)
+	// chipActiveStyle marks the preset chip ←/→ last activated — bold + underlined
+	// accent so it stands out from both an inactive chip and a fully-checked one.
+	chipActiveStyle = lipgloss.NewStyle().Foreground(accent).Bold(true).Underline(true)
+	preStyle        = lipgloss.NewStyle().Foreground(warn) // pre-release flag
+	checkOnStyle    = lipgloss.NewStyle().Foreground(good).Bold(true)
 )
 
 // renderDeployModal dispatches to the active phase's renderer.
@@ -55,7 +58,7 @@ func (m Model) renderDeploySelect(ds *deployState) string {
 		b.WriteString("\n" + errStyle.Render("no ghcr.io image on these deployments — cannot list releases") + "\n")
 	}
 
-	hint := "space toggle · 1-9 preset · enter versions › · esc cancel"
+	hint := "space toggle · 1-9 preset · ←/→ preset · enter versions › · esc cancel"
 	b.WriteString("\n" + footerStyle.Render(hint))
 	return b.String()
 }

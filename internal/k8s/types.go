@@ -113,6 +113,11 @@ type Pod struct {
 	// Deployment is the owning deployment name, resolved via the ReplicaSet
 	// ownerRef chain; empty when a pod maps to no deployment.
 	Deployment string `json:"deployment"`
+	// Image is the primary container's image (parsed off the pod's container
+	// spec, same primary-container selection deployments use). Lets the pods view
+	// show the running tag so a rollout can be watched live (old pods carry the
+	// old tag, new pods the new). Zero ImageRef when the pod has no containers.
+	Image ImageRef `json:"image"`
 	// Phase from .status.phase (Pending|Running|Succeeded|Failed|Unknown|…).
 	Phase string `json:"phase"`
 	// Ready is true when every container reports ready.

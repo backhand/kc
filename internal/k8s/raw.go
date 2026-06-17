@@ -135,6 +135,9 @@ type rawPod struct {
 	Metadata rawObjectMeta `json:"metadata"`
 	Spec     *struct {
 		NodeName string `json:"nodeName"`
+		// Containers is the pod's container specs — we read each container's
+		// image so the pods view can show the running tag (watch a rollout live).
+		Containers []rawContainer `json:"containers"`
 	} `json:"spec"`
 	Status *struct {
 		Phase             string               `json:"phase"`

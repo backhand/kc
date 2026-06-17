@@ -60,7 +60,7 @@ func (m Model) renderRestartSelect(rs *restartState) string {
 	if rs.origin != "" {
 		b.WriteString("\n" + headerStyle.Render("from: ") + lipgloss.NewStyle().Foreground(accent).Render(rs.origin) + "\n")
 	}
-	hint := "space toggle · 1-9 preset · enter confirm › · esc cancel"
+	hint := "space toggle · 1-9 preset · ←/→ preset · enter confirm › · esc cancel"
 	b.WriteString("\n" + footerStyle.Render(hint))
 	return b.String()
 }

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/exp/teatest"
 
 	"github.com/thinkpilot/infrastructure/tools/kc/internal/cache"
@@ -339,6 +340,42 @@ func TestScale_NamespaceViewSelectSetReplicasAndArgv(t *testing.T) {
 		if !reflect.DeepEqual(status["deployment/"+dep], wantStatus) {
 			t.Errorf("rollout status argv for %s =\n  %v\nwant\n  %v", dep, status["deployment/"+dep], wantStatus)
 		}
+	}
+}
+
+// TestScale_ArrowSwitchesPreset asserts ←/→ in the scale select phase cycle the
+// active preset end-to-end (key → shared handleSelectKey → render): → sets the
+// selection to exactly the next preset, the active chip renders with the "›"
+// marker, and the wiring is shared so deploy/restart get it too (selection-level
+// unit tests cover the cycling/clamp matrix; this proves the modal wiring).
+func TestScale_ArrowSwitchesPreset(t *testing.T) {
+	deps, _, _, hist := opsHarness(t)
+	// Two presets: [responder sender] (top, contains the focused responder → it's
+	// the one pre-checked & active) and [sender].
+	scope := store.Scope{Cluster: testCluster, App: "mailon"}
+	_ = hist.RecordDeploy(scope, []string{"sender"})
+	_ = hist.RecordDeploy(scope, []string{"responder", "sender"})
+
+	tm := onMailonNamespace(t, deps)
+	tm.Send(runeMsg('s')) // open scale SELECT
+	waitFor(t, tm, "select deployments to scale", "responder+sender", "←/→ preset")
+
+	// → cycles the active preset to the NEXT one ([sender]); the active chip shows
+	// the "›2:sender" marker once it lands there.
+	tm.Send(keyMsg(tea.KeyRight))
+	waitFor(t, tm, "›2:sender")
+
+	tm.Send(ctrlCMsg())
+	m := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second)).(Model)
+	if m.scaleModal == nil {
+		t.Fatal("scale modal closed unexpectedly")
+	}
+	// The selection is now EXACTLY the [sender] preset (index 1) — responder off.
+	if m.scaleModal.sel.activePreset != 1 {
+		t.Errorf("activePreset = %d, want 1 (the [sender] preset after →)", m.scaleModal.sel.activePreset)
+	}
+	if m.scaleModal.sel.checked["responder"] || !m.scaleModal.sel.checked["sender"] {
+		t.Errorf("checked = %v, want exactly sender (→ set the selection to the [sender] preset)", m.scaleModal.sel.checked)
 	}
 }
 

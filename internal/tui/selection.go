@@ -31,6 +31,12 @@ type selection struct {
 	presets [][]string
 	// cursor is the focused row.
 	cursor int
+	// activePreset tracks which preset ←/→ last activated (an index into
+	// presets), so the active chip can render distinctly and ←/→ cycle from it.
+	// Initialised to the preset newSelection pre-checked (the first containing the
+	// focused deployment), or -1 when the open fell back to {current}/{top}. ←/→
+	// clamp it to [0, len(presets)-1]; from -1 both arrows land on 0.
+	activePreset int
 }
 
 // newSelection builds a selection, preselecting the set that contains the
@@ -46,9 +52,10 @@ type selection struct {
 // The cursor starts on `current`'s row (0 when it can't be located).
 func newSelection(deployments []k8s.Deployment, presets [][]string, current string) selection {
 	s := selection{
-		deployments: deployments,
-		checked:     map[string]bool{},
-		presets:     presets,
+		deployments:  deployments,
+		checked:      map[string]bool{},
+		presets:      presets,
+		activePreset: -1, // -1 until a preset is pre-checked (or ←/→ activates one)
 	}
 	existing := s.existing()
 
@@ -60,14 +67,16 @@ func newSelection(deployments []k8s.Deployment, presets [][]string, current stri
 		// is exactly one and nothing learned, so the modal never opens empty.
 		if len(presets) > 0 {
 			s.checkAll(presets[0], existing)
+			s.activePreset = 0
 		}
 		if !s.anyChecked() && len(deployments) == 1 {
 			s.checked[deployments[0].Name] = true
 		}
 	default:
 		// Pre-check the first preset that contains current, else just {current}.
-		if preset, ok := firstPresetContaining(presets, current, existing); ok {
-			s.checkAll(preset, existing)
+		if idx, ok := firstPresetContaining(presets, current, existing); ok {
+			s.checkAll(presets[idx], existing)
+			s.activePreset = idx
 		} else if existing[current] {
 			s.checked[current] = true
 		}
@@ -76,20 +85,20 @@ func newSelection(deployments []k8s.Deployment, presets [][]string, current stri
 	return s
 }
 
-// firstPresetContaining returns the first preset (ranked order) that contains
-// `current` as an existing deployment. ok is false when none do.
-func firstPresetContaining(presets [][]string, current string, existing map[string]bool) ([]string, bool) {
+// firstPresetContaining returns the index of the first preset (ranked order)
+// that contains `current` as an existing deployment. ok is false when none do.
+func firstPresetContaining(presets [][]string, current string, existing map[string]bool) (int, bool) {
 	if !existing[current] {
-		return nil, false
+		return -1, false
 	}
-	for _, p := range presets {
+	for i, p := range presets {
 		for _, name := range p {
 			if name == current && existing[name] {
-				return p, true
+				return i, true
 			}
 		}
 	}
-	return nil, false
+	return -1, false
 }
 
 // existing is the set of deployment names that currently exist.
@@ -160,6 +169,45 @@ func (s *selection) togglePreset(preset []string) {
 	}
 }
 
+// setToPreset SETS the selection to exactly the preset at index i: its existing
+// names checked, everything else unchecked, and i recorded as the active preset.
+// Used by ←/→ — distinct from togglePreset (the number keys), which flips a
+// preset on/off without disturbing the rest of the selection.
+func (s *selection) setToPreset(i int) {
+	if i < 0 || i >= len(s.presets) {
+		return
+	}
+	existing := s.existing()
+	s.checked = map[string]bool{}
+	for _, name := range s.presets[i] {
+		if existing[name] {
+			s.checked[name] = true
+		}
+	}
+	s.activePreset = i
+}
+
+// cyclePreset moves the active preset by delta (-1 for ←, +1 for →) through
+// 1..n and SETS the selection to it. Clamped to [0, len(presets)-1]; from the
+// initial -1 (no preset pre-checked) both arrows land on 0. A no-op when there
+// are no presets.
+func (s *selection) cyclePreset(delta int) {
+	if len(s.presets) == 0 {
+		return
+	}
+	next := s.activePreset + delta
+	if s.activePreset < 0 {
+		next = 0 // from -1, either arrow lands on the first preset
+	}
+	if next < 0 {
+		next = 0
+	}
+	if next > len(s.presets)-1 {
+		next = len(s.presets) - 1
+	}
+	s.setToPreset(next)
+}
+
 // anyChecked reports whether at least one deployment is checked.
 func (s *selection) anyChecked() bool {
 	for _, v := range s.checked {
@@ -200,9 +248,15 @@ func (s *selection) presetFullyChecked(preset []string) bool {
 }
 
 // handleSelectKey applies the shared select-phase navigation/toggle keys
-// (↑/↓ move, space toggles the row, 1-9 toggle a preset) to the selection,
-// returning true when the key was consumed. The phase-specific keys (Confirm to
-// advance, Cancel to back out) stay with each modal's own handler.
+// (↑/↓ move, ←/→ cycle the active preset, space toggles the row, 1-9 toggle a
+// preset) to the selection, returning true when the key was consumed. The
+// phase-specific keys (Confirm to advance, Cancel to back out) stay with each
+// modal's own handler.
+//
+// ←/→ match tea.KeyLeft/tea.KeyRight directly (not keys.Up/Down) — they each SET
+// the selection to one preset and cycle the active index, which is distinct from
+// the number keys' per-preset toggle. The select-phase handlers run Cancel/Confirm
+// (esc/enter) first, and neither is bound to ←/→, so the arrows reach here.
 func (s *selection) handleSelectKey(msg tea.KeyMsg) bool {
 	switch {
 	case key.Matches(msg, keys.Up):
@@ -210,6 +264,12 @@ func (s *selection) handleSelectKey(msg tea.KeyMsg) bool {
 		return true
 	case key.Matches(msg, keys.Down):
 		s.moveDown()
+		return true
+	case msg.Type == tea.KeyLeft:
+		s.cyclePreset(-1)
+		return true
+	case msg.Type == tea.KeyRight:
+		s.cyclePreset(+1)
 		return true
 	case key.Matches(msg, keys.Toggle):
 		s.toggle()
@@ -249,7 +309,9 @@ func renderSelectList(s *selection) string {
 		b.WriteString(marker + line + "\n")
 	}
 
-	// Preset chips (one-key toggles for learned deployment-sets).
+	// Preset chips (one-key toggles for learned deployment-sets). The chip ←/→
+	// last activated is marked with a leading "›" and the active style, so it's
+	// clear which preset the arrows are cycling through.
 	if len(s.presets) > 0 {
 		b.WriteString("\n" + headerStyle.Render("presets:") + " ")
 		chips := make([]string, 0, len(s.presets))
@@ -258,6 +320,10 @@ func renderSelectList(s *selection) string {
 			style := chipStyle
 			if s.presetFullyChecked(p) {
 				style = chipOnStyle
+			}
+			if i == s.activePreset {
+				label = "›" + label
+				style = chipActiveStyle
 			}
 			chips = append(chips, style.Render(label))
 		}
