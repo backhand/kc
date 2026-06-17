@@ -1,0 +1,13 @@
+# dependencies
+node_modules/
+
+# compiled standalone binaries (produced by `bun run build`)
+/kc
+/kc-linux-x64
+*.exe
+
+# build artifacts (e.g. external sourcemaps from `--sourcemap`)
+*.map
+
+# logs / scratch
+*.log
