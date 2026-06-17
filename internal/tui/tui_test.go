@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -260,12 +261,12 @@ func TestCursorMovement(t *testing.T) {
 	waitFor(t, tm, "mailon-staging", "all-namespaces")
 
 	// Move down to the 2nd namespace ("mailon-staging"), then Enter; the
-	// namespace fetcher returns the mailon view regardless, but the breadcrumb
-	// must read "all-namespaces › mailon-staging" (proving cursor→selection
+	// namespace fetcher returns the mailon view regardless, but the top-bar
+	// context must read "mailon-staging · [user]" (proving cursor→selection
 	// wiring drives which child is pushed).
 	tm.Send(runeMsg('j')) // -> mailon-staging
 	tm.Send(keyMsg(tea.KeyEnter))
-	waitFor(t, tm, "all-namespaces › mailon-staging")
+	waitFor(t, tm, "mailon-staging · [user]")
 
 	tm.Send(runeMsg('q'))
 	fm := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second))
@@ -296,9 +297,9 @@ func TestEntryAtNamespace(t *testing.T) {
 	h.deps.Entry = Entry{Resolution: resolution("mailon")}
 	tm := teatest.NewTestModel(t, New(h.deps), teatest.WithInitialTermSize(120, 30))
 
-	// Entry view is the mailon namespace (deployments visible immediately),
-	// breadcrumb starts at all-namespaces › mailon.
-	waitFor(t, tm, "responder", "all-namespaces › mailon")
+	// Entry view is the mailon namespace (deployments visible immediately); the
+	// top-bar context reads "mailon · [user]".
+	waitFor(t, tm, "responder", "mailon · [user]")
 
 	// Backspace zooms out to the overview.
 	tm.Send(keyMsg(tea.KeyBackspace))
@@ -327,7 +328,90 @@ func TestFetchErrorKeepsStaleData(t *testing.T) {
 	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 }
 
+// TestOverviewFrameLayout captures the rendered overview frame and asserts the
+// header layout: the cluster-total row comes first, the per-node rows underneath
+// share the cluster row's column starts (the "cpu" gauge token at an identical
+// offset on every resource row), a blank line separates the node block from the
+// NAMESPACE list, and the freshness indicator lives in the top bar (line 1,
+// after the "kc · …" breadcrumb) rather than in the footer.
+func TestOverviewFrameLayout(t *testing.T) {
+	h := newHarness(t, defaultFetchers())
+	tm := teatest.NewTestModel(t, New(h.deps), teatest.WithInitialTermSize(120, 30))
+	// Wait for the fresh overview (mailon + the node rows + a freshness stamp).
+	waitFor(t, tm, "mailon", "kube-system", "updated")
+	tm.Send(runeMsg('q'))
+	fm := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second))
+	m, ok := fm.(Model)
+	if !ok {
+		t.Fatalf("final model type %T", fm)
+	}
+	m.quitting = false // View() blanks while quitting; render the last real frame
+	frame := stripANSI(m.View())
+	lines := strings.Split(frame, "\n")
+
+	// 1) Freshness in the TOP BAR: line 0 carries "kc · all-namespaces" AND the
+	//    freshness stamp; the footer (key hints) must NOT carry it.
+	if !strings.Contains(lines[0], "kc · all-namespaces") || !strings.Contains(lines[0], "updated") {
+		t.Fatalf("top bar missing breadcrumb+freshness; got %q", lines[0])
+	}
+	for _, ln := range lines {
+		if strings.Contains(ln, "[d]eploy") && strings.Contains(ln, "updated") {
+			t.Fatalf("freshness leaked into the footer line: %q", ln)
+		}
+	}
+
+	// Locate the resource rows and the NAMESPACE column header by content.
+	idxCluster, idxFirstNode, idxNamespace := -1, -1, -1
+	for i, ln := range lines {
+		s := strings.TrimSpace(ln)
+		switch {
+		case idxCluster < 0 && strings.HasPrefix(s, "cluster"):
+			idxCluster = i
+		case idxCluster >= 0 && idxFirstNode < 0 && strings.HasPrefix(s, "cp-0"):
+			idxFirstNode = i
+		case strings.HasPrefix(s, "NAMESPACE"):
+			idxNamespace = i
+		}
+	}
+	if idxCluster < 0 || idxFirstNode < 0 || idxNamespace < 0 {
+		t.Fatalf("could not locate header rows in frame:\n%s", frame)
+	}
+
+	// 2) Cluster total on TOP, the first node below it.
+	if !(idxCluster < idxFirstNode) {
+		t.Fatalf("cluster row (%d) must precede the node rows (%d)", idxCluster, idxFirstNode)
+	}
+
+	// 1) Columns aligned: the "cpu " token starts at the same offset on the
+	//    cluster row and every node row (cp-0, agent-0).
+	clusterCPU := strings.Index(lines[idxCluster], "cpu ")
+	if clusterCPU < 0 {
+		t.Fatalf("no cpu gauge on the cluster row: %q", lines[idxCluster])
+	}
+	for i := idxFirstNode; i < idxNamespace; i++ {
+		if strings.TrimSpace(lines[i]) == "" {
+			continue
+		}
+		if got := strings.Index(lines[i], "cpu "); got != clusterCPU {
+			t.Fatalf("cpu column misaligned: cluster@%d vs node row %q cpu@%d",
+				clusterCPU, lines[i], got)
+		}
+	}
+
+	// 3) Blank line between the node block and the NAMESPACE list. The line
+	//    directly above the NAMESPACE header must be empty.
+	if got := strings.TrimSpace(lines[idxNamespace-1]); got != "" {
+		t.Fatalf("expected a blank line before the NAMESPACE list, got %q", lines[idxNamespace-1])
+	}
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
+
+var ansiRE = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]`)
+
+// stripANSI removes ANSI escape sequences so frame assertions compare visible
+// text and column offsets (lipgloss color codes would otherwise skew indices).
+func stripANSI(s string) string { return ansiRE.ReplaceAllString(s, "") }
 
 // waitFor waits until the output contains all of the given substrings.
 func waitFor(t *testing.T, tm *teatest.TestModel, subs ...string) {

@@ -29,18 +29,36 @@ var (
 	hintStyle     = lipgloss.NewStyle().Foreground(dim)
 )
 
+// Node-header column widths. The cluster-total row and the per-node rows share
+// these so the name / role / cpu-gauge / mem-gauge columns start at the same
+// offset on every line. The cells are joined with fixed-width lipgloss styles
+// (ANSI-aware) so a colored cell like the readiness badge doesn't shift the
+// columns after it — fmt's %-Ns counts the escape bytes, lipgloss.Width doesn't.
+const (
+	nodeNameW  = 26
+	nodeRoleW  = 13
+	nodeReadyW = 9
+)
+
+var (
+	nodeNameCol  = lipgloss.NewStyle().Width(nodeNameW)
+	nodeRoleCol  = lipgloss.NewStyle().Width(nodeRoleW)
+	nodeReadyCol = lipgloss.NewStyle().Width(nodeReadyW)
+)
+
 // minListRows is the floor for the list area: even on a tiny terminal we keep
 // at least one row visible (the per-View geometry subtracts the actual chrome —
-// title, header block, column header, footer — from the height).
+// top bar, resource header, column header, footer — from the height).
 const minListRows = 1
 
 // visibleRows is how many list rows fit given the terminal height and the
 // header height of the visible level. Used by the cursor/offset clamping in
 // update.go.
 func (m Model) visibleRows() int {
-	header := m.headerHeight(*m.top())
-	// title(1) + blank(1) + header + blank(1) + colhead(1) + footer(2)
-	chrome := 1 + 1 + header + 1 + 1 + 2
+	// topbar(1) + blank(1) + header-block + colhead(1) + footer(2). The header
+	// block is the overview node lines plus their trailing blank separator; the
+	// non-overview views render no resource header (headerHeight == 0).
+	chrome := 1 + 1 + m.headerHeight(*m.top()) + 1 + 2
 	rows := m.height - chrome
 	if rows < minListRows {
 		return minListRows
@@ -48,24 +66,25 @@ func (m Model) visibleRows() int {
 	return rows
 }
 
-// headerHeight returns how many lines the per-level header block occupies.
+// headerHeight returns how many lines the per-level resource header occupies,
+// including the blank line that separates it from the list. Only the overview
+// has one (the cluster-total + per-node block); every other view's context now
+// lives in the top bar, so they have no resource header.
 func (m Model) headerHeight(l level) int {
-	switch l.kind {
-	case levelOverview:
-		// One line per node, plus a totals line.
-		n := len(l.overview.Nodes)
-		if n == 0 {
-			return 1
-		}
-		return n + 1
-	default:
-		return 1 // a single context line
+	if l.kind != levelOverview {
+		return 0
 	}
+	// "cluster" totals line + one line per node, then a blank separator.
+	n := len(l.overview.Nodes)
+	if n == 0 {
+		return 1 + 1 // "no node data yet" + blank
+	}
+	return (n + 1) + 1
 }
 
-// View renders the visible level: title, header, column header, the scrolled
-// row list, then the footer (breadcrumb + freshness + key hints). When the
-// deploy modal is open it takes over the whole frame.
+// View renders the visible level: the top bar (context breadcrumb + freshness),
+// the resource header, the column header, the scrolled row list, then the footer
+// (key hints). When the deploy modal is open it takes over the whole frame.
 func (m Model) View() string {
 	if m.quitting {
 		return ""
@@ -79,37 +98,79 @@ func (m Model) View() string {
 	top := *m.top()
 
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("kc") + "  " + headerStyle.Render(m.breadcrumb()) + "\n\n")
-	b.WriteString(m.renderHeader(top) + "\n")
+	b.WriteString(m.renderTopBar(top) + "\n\n")
+	// Only the overview carries a resource header (the node block). Its context
+	// — and every other view's — now lives in the top bar, so the non-overview
+	// views go straight from the top bar to the column header. A blank line
+	// separates the node block from the namespace list.
+	if top.kind == levelOverview {
+		b.WriteString(m.renderHeader(top) + "\n\n")
+	}
 	b.WriteString(m.renderList(top))
 	b.WriteString("\n" + m.renderFooter(top))
 	return b.String()
 }
 
-// ── Header (per level) ───────────────────────────────────────────────────────
+// renderTopBar is the one-line context bar: "kc · <context>" on the left, the
+// freshness indicator right-aligned to the terminal width. The context adapts
+// per view (see topBarContext) so the bar carries the current view's scope.
+func (m Model) renderTopBar(l level) string {
+	left := titleStyle.Render("kc") + headerStyle.Render(" · "+m.topBarContext(l))
+	right := hintStyle.Render(m.freshness(l))
+	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right)
+	if gap < 2 {
+		gap = 2 // always keep a visible separation, even on a narrow terminal
+	}
+	return left + strings.Repeat(" ", gap) + right
+}
 
-func (m Model) renderHeader(l level) string {
+// topBarContext renders the current view's scope for the top bar, joined by "·":
+//
+//	overview:    all-namespaces
+//	group:       <app>-*
+//	namespace:   <namespace> · [user] · N deployments
+//	deployment:  <namespace> · <deployment>
+func (m Model) topBarContext(l level) string {
 	switch l.kind {
 	case levelOverview:
-		return m.renderNodeHeader(l)
+		return "all-namespaces"
 	case levelGroup:
-		return headerStyle.Render(fmt.Sprintf("app group %q — %d namespaces", l.app, len(l.groupNs)))
+		return l.app + "-*"
 	case levelNamespace:
-		return headerStyle.Render(fmt.Sprintf("namespace %s [%s] — %d deployments",
-			l.namespace, l.nsView.Kind, len(l.nsView.Deployments)))
+		return fmt.Sprintf("%s · [%s] · %d deployments",
+			l.namespace, l.nsView.Kind, len(l.nsView.Deployments))
 	case levelDeployment:
-		return headerStyle.Render(fmt.Sprintf("%s/%s — %d pods", l.namespace, l.deployment, len(l.pods)))
+		return l.namespace + " · " + l.deployment
 	}
 	return ""
 }
 
-// renderNodeHeader renders one line per node (role, readiness, cpu+mem gauges)
-// and a cluster totals line — the all-namespaces resource header.
+// ── Header (per level) ───────────────────────────────────────────────────────
+
+func (m Model) renderHeader(l level) string {
+	// Only the overview has a resource header; every other view's context lives
+	// in the top bar (renderTopBar), and View() skips calling this for them.
+	if l.kind == levelOverview {
+		return m.renderNodeHeader(l)
+	}
+	return ""
+}
+
+// renderNodeHeader renders the all-namespaces resource header: the cluster-total
+// row first, then one line per node (role, readiness, cpu+mem gauges). All rows
+// share the same fixed column starts (nodeNameW/nodeRoleW/nodeReadyW), so the
+// cpu/mem gauges line up across the cluster row and every node row.
 func (m Model) renderNodeHeader(l level) string {
 	if len(l.overview.Nodes) == 0 {
 		return headerStyle.Render("no node data yet")
 	}
-	var b strings.Builder
+	rows := make([]string, 0, len(l.overview.Nodes)+1)
+	// Cluster totals row on top.
+	tot := l.overview.Totals
+	cpuTot := m.gaugeCell(totalCPU(tot), tot.Capacity.CPUMillicores, "cpu", formatCPU)
+	memTot := m.gaugeCell(totalMem(tot), tot.Capacity.MemoryBytes, "mem", formatMem)
+	rows = append(rows, m.nodeHeaderRow(titleStyle, "cluster", "", "", cpuTot, memTot))
+	// Each node underneath.
 	for _, n := range l.overview.Nodes {
 		role := "worker"
 		if n.ControlPlane {
@@ -121,16 +182,25 @@ func (m Model) renderNodeHeader(l level) string {
 		}
 		cpu := m.gaugeCell(usagePtrCPU(n.Usage), n.Capacity.CPUMillicores, "cpu", formatCPU)
 		mem := m.gaugeCell(usagePtrMem(n.Usage), n.Capacity.MemoryBytes, "mem", formatMem)
-		b.WriteString(headerStyle.Render(fmt.Sprintf("  %-26s %-13s %-9s  %s  %s",
-			truncate(n.Name, 26), role, ready, cpu, mem)) + "\n")
+		rows = append(rows, m.nodeHeaderRow(headerStyle, truncate(n.Name, nodeNameW), role, ready, cpu, mem))
 	}
-	// Totals line.
-	tot := l.overview.Totals
-	cpuTot := m.gaugeCell(totalCPU(tot), tot.Capacity.CPUMillicores, "cpu", formatCPU)
-	memTot := m.gaugeCell(totalMem(tot), tot.Capacity.MemoryBytes, "mem", formatMem)
-	b.WriteString(titleStyle.Render(fmt.Sprintf("  %-26s %-13s %-9s  %s  %s",
-		"cluster", "", "", cpuTot, memTot)))
-	return b.String()
+	return strings.Join(rows, "\n")
+}
+
+// nodeHeaderRow lays out one resource-header line with fixed column starts. The
+// name/role/ready cells are width-padded with lipgloss (ANSI-aware) so a colored
+// readiness badge doesn't shift the cpu/mem gauges that follow it — fmt's %-Ns
+// would otherwise count the badge's escape bytes and skew every later column.
+// rowStyle colors the whole line (titleStyle for the cluster row, headerStyle
+// for nodes); the readiness badge and gauge bars keep their own colors via
+// lipgloss style nesting.
+func (m Model) nodeHeaderRow(rowStyle lipgloss.Style, name, role, ready, cpu, mem string) string {
+	line := "  " +
+		nodeNameCol.Render(name) + " " +
+		nodeRoleCol.Render(role) + " " +
+		nodeReadyCol.Render(ready) + "  " +
+		cpu + "  " + mem
+	return rowStyle.Render(line)
 }
 
 // gaugeCell renders "label used/cap ▕███░░▏" with a small bar. used == -1 means
@@ -300,25 +370,7 @@ func (m Model) podRows(l level) (string, []row) {
 	return head, out
 }
 
-// ── Footer (breadcrumb + freshness + key hints) ──────────────────────────────
-
-// breadcrumb renders the zoom path, e.g. "all-namespaces › mailon › responder".
-func (m Model) breadcrumb() string {
-	parts := make([]string, 0, len(m.stack))
-	for _, l := range m.stack {
-		switch l.kind {
-		case levelOverview:
-			parts = append(parts, "all-namespaces")
-		case levelGroup:
-			parts = append(parts, l.app+"-*")
-		case levelNamespace:
-			parts = append(parts, l.namespace)
-		case levelDeployment:
-			parts = append(parts, l.deployment)
-		}
-	}
-	return strings.Join(parts, " › ")
-}
+// ── Freshness + footer (key hints) ───────────────────────────────────────────
 
 // freshness renders the SPEC freshness indicator: "↻ refreshing…" while a fetch
 // is in flight, else "updated Ns ago" (or "stale · Ns ago" past staleAfter).
@@ -336,20 +388,22 @@ func (m Model) freshness(l level) string {
 	return "updated " + formatAge(age) + " ago"
 }
 
+// renderFooter renders the op-key hints + the help line. The freshness indicator
+// has moved to the top bar (renderTopBar); the footer keeps only the key hints,
+// surfacing a fetch error in their place when one is set.
 func (m Model) renderFooter(l level) string {
 	m.help.ShowAll = m.showHelp
 	hints := m.help.View(keys)
 
-	fresh := m.freshness(l)
-	left := hintStyle.Render(fresh)
+	// Op-key hints come from renderOpHints: deploy brightens in a namespace/
+	// deployment view; restart/logs/shell brighten from a namespace or pods view;
+	// unavailable ops stay faint. Freshness now lives in the top bar
+	// (renderTopBar), so the footer carries only the hints — or a fetch error in
+	// their place.
+	ops := m.renderOpHints()
 	if l.err != "" {
-		left = errStyle.Render("error: " + truncate(l.err, 60))
+		ops = errStyle.Render("error: " + truncate(l.err, 60))
 	}
 
-	// Op-key hints. All four contextual ops act on the selected workload: deploy
-	// from a namespace/deployment view; restart/logs/shell from a namespace or
-	// pods view. Available ops render bright, unavailable ones faint.
-	ops := m.renderOpHints()
-
-	return left + "    " + ops + "\n" + footerStyle.Render(hints)
+	return ops + "\n" + footerStyle.Render(hints)
 }

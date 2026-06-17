@@ -145,7 +145,7 @@ func ctrlCMsg() tea.Msg { return tea.KeyMsg{Type: tea.KeyCtrlC} }
 func openModalOnMailon(t *testing.T, deps Deps) *teatest.TestModel {
 	t.Helper()
 	tm := teatest.NewTestModel(t, New(deps), teatest.WithInitialTermSize(120, 40))
-	waitFor(t, tm, "responder", "all-namespaces › mailon") // namespace view loaded
+	waitFor(t, tm, "responder", "mailon · [user]") // namespace view loaded (top-bar context)
 	tm.Send(runeMsg('d'))
 	waitFor(t, tm, "deploy — mailon", "select deployments")
 	return tm
@@ -163,7 +163,7 @@ func TestDeploy_OpensModal(t *testing.T) {
 
 	// Esc closes the modal — back to the namespace view (DEPLOYMENT column).
 	tm.Send(escMsg())
-	waitFor(t, tm, "DEPLOYMENT", "all-namespaces › mailon")
+	waitFor(t, tm, "DEPLOYMENT", "mailon · [user]")
 
 	tm.Send(runeMsg('q'))
 	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))

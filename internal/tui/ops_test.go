@@ -85,7 +85,7 @@ func opsHarness(t *testing.T) (Deps, *recordingRunner, *capturedExec, *store.Act
 func onMailonNamespace(t *testing.T, deps Deps) *teatest.TestModel {
 	t.Helper()
 	tm := teatest.NewTestModel(t, New(deps), teatest.WithInitialTermSize(120, 40))
-	waitFor(t, tm, "responder", "all-namespaces › mailon", "DEPLOYMENT")
+	waitFor(t, tm, "responder", "mailon · [user]", "DEPLOYMENT")
 	return tm
 }
 
@@ -193,7 +193,7 @@ func TestRestart_EscCancelsBeforeMutation(t *testing.T) {
 	tm.Send(runeMsg('r')) // open restart confirm
 	waitFor(t, tm, "will restart", "deployment/responder")
 	tm.Send(escMsg()) // cancel → back to the namespace view
-	waitFor(t, tm, "DEPLOYMENT", "all-namespaces › mailon")
+	waitFor(t, tm, "DEPLOYMENT", "mailon · [user]")
 
 	tm.Send(runeMsg('q'))
 	m := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second)).(Model)

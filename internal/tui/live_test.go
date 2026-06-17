@@ -141,9 +141,9 @@ func TestLive_RepoEntry(t *testing.T) {
 
 	tm := teatest.NewTestModel(t, New(deps), teatest.WithInitialTermSize(132, 40))
 	teatest.WaitFor(t, tm.Output(), func(b []byte) bool {
-		// Breadcrumb must include the mailon namespace at entry (not just the
-		// overview), and a real deployment row must have loaded.
-		return bytes.Contains(b, []byte("all-namespaces › mailon")) &&
+		// Top-bar context must include the mailon namespace at entry (not just
+		// the overview), and a real deployment row must have loaded.
+		return bytes.Contains(b, []byte("mailon · [user]")) &&
 			bytes.Contains(b, []byte("DEPLOYMENT")) &&
 			bytes.Contains(b, []byte("web"))
 	}, teatest.WithDuration(15*time.Second))
