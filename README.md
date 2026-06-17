@@ -11,14 +11,30 @@ terminal to `kubectl`. See [`SPEC.md`](./SPEC.md) for the design.
 
 ## Install
 
+### curl \| sh (quickest — no prerequisites)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/backhand/kc/master/install.sh | sh
+```
+
+Grabs the prebuilt static binary for your OS/arch from the latest GitHub
+release, verifies it against the release `checksums.txt`, and installs it to
+`/usr/local/bin`. Override the destination with `KC_INSTALL_DIR`, or pin a
+version with `KC_VERSION` (e.g. `KC_VERSION=v0.1.0`). No Homebrew tap-trust
+needed.
+
 ### Homebrew (macOS / Linux)
 
 ```sh
 brew tap backhand/tap
+brew trust --cask backhand/tap/kc   # one-time, per machine (see below)
 brew install kc
-# …or in one line:
-brew install backhand/tap/kc
 ```
+
+Homebrew 6.0+ won't evaluate a third-party tap's (unsandboxed) Ruby until you
+explicitly trust it, so the one-time `brew trust` step is required before
+`install`. Prefer trusting just the cask as above; to trust the whole tap
+instead, run `brew trust backhand/tap`.
 
 ### go install
 
@@ -35,7 +51,7 @@ make build      # -> ./kc  (static, no cgo)
 
 **Runtime requirements:** `kubectl` (required — kc shells out to it for
 everything), plus `git` + `gh` for the deploy flow (it lists GitHub releases to
-pick a version). The Homebrew formula pulls in `kubernetes-cli` automatically.
+pick a version). The Homebrew cask pulls in `kubernetes-cli` automatically.
 
 ## Usage
 

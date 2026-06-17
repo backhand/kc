@@ -57,6 +57,13 @@ changelog:
       - "^ci:"
       - "Merge "
 
+release:
+  # Ship the curl|sh installer alongside the binaries so a release-pinned URL
+  # (…/releases/latest/download/install.sh) works too — the README documents the
+  # raw-master URL, but this lets users grab the script that matches a given tag.
+  extra_files:
+    - glob: ./install.sh
+
 # Homebrew cask (GoReleaser deprecated `brews`/formulae for binary CLIs in
 # favour of casks; casks ship the prebuilt binary and auto-strip the macOS
 # quarantine xattr so an unsigned binary still runs). Install stays
