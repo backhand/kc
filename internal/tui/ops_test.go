@@ -207,14 +207,14 @@ func TestRestart_EscCancelsBeforeMutation(t *testing.T) {
 
 // ── Logs / shell (interactive, ExecProcess) ───────────────────────────────────
 
-// TestLogs_NamespaceViewBuildsDeploymentCmd asserts `L` in the namespace view
-// builds the correct `kubectl logs deployment/<d> …` *exec.Cmd, captured via the
-// ExecHook (NOT spawned — no live stream).
+// TestLogs_NamespaceViewBuildsDeploymentCmd asserts lowercase `l` in the
+// namespace view builds the correct `kubectl logs deployment/<d> …` *exec.Cmd,
+// captured via the ExecHook (NOT spawned — no live stream).
 func TestLogs_NamespaceViewBuildsDeploymentCmd(t *testing.T) {
 	deps, _, captured, _ := opsHarness(t)
 	tm := onMailonNamespace(t, deps)
 
-	tm.Send(runeMsg('L')) // logs for the selected deployment (responder)
+	tm.Send(runeMsg('l')) // logs for the selected deployment (responder)
 	cmd := waitForExec(t, captured)
 
 	assertKubectl(t, cmd, []string{
@@ -226,8 +226,8 @@ func TestLogs_NamespaceViewBuildsDeploymentCmd(t *testing.T) {
 	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 }
 
-// TestLogs_PodsViewBuildsPodCmd asserts `L` in the pods view targets the EXACT
-// selected pod (`pod/<name>`).
+// TestLogs_PodsViewBuildsPodCmd asserts the capital-`L` alias still works (in the
+// pods view) and targets the EXACT selected pod (`pod/<name>`).
 func TestLogs_PodsViewBuildsPodCmd(t *testing.T) {
 	deps, _, captured, _ := opsHarness(t)
 	tm := onResponderPods(t, deps) // cursor on responder-aaa
@@ -242,6 +242,29 @@ func TestLogs_PodsViewBuildsPodCmd(t *testing.T) {
 
 	tm.Send(runeMsg('q'))
 	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+}
+
+// TestLogs_LowercaseLOpensLogsNotDrillIn is the regression test for the keymap
+// fix: lowercase `l` opens logs for the selected deployment — it must NOT drill
+// into the pods view. `l` used to be bound to drill-in, which silently swallowed
+// the logs op (the reported "[L]ogs doesn't work": pressing l navigated to the
+// pods view instead of streaming logs).
+func TestLogs_LowercaseLOpensLogsNotDrillIn(t *testing.T) {
+	deps, _, captured, _ := opsHarness(t)
+	tm := onMailonNamespace(t, deps)
+
+	tm.Send(runeMsg('l')) // lowercase l → logs (previously drill-in)
+	cmd := waitForExec(t, captured)
+	assertKubectl(t, cmd, []string{
+		"--context", "k3s", "-n", "mailon", "logs", "deployment/responder",
+		"--all-containers", "--tail=200", "-f",
+	})
+
+	tm.Send(runeMsg('q'))
+	m := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second)).(Model)
+	if got := m.top().kind; got != levelNamespace {
+		t.Errorf("lowercase l navigated (level=%v); it must open logs, not drill in", got)
+	}
 }
 
 // TestShell_NamespaceViewBuildsDeploymentExec asserts `s` in the namespace view

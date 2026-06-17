@@ -5,7 +5,7 @@ import "github.com/charmbracelet/bubbles/key"
 // keyMap holds every binding so the help text (bubbles/help) stays in lockstep
 // with the actual handlers. The contextual operation keys all act on the
 // workload selected in the current view — a deployment (namespace view) or a pod
-// (pods view): [d]eploy, [r]estart, [L]ogs, [s]hell (SPEC "Operations").
+// (pods view): [d]eploy, [r]estart, [l]ogs, [s]hell (SPEC "Operations").
 type keyMap struct {
 	Up    key.Binding
 	Down  key.Binding
@@ -39,7 +39,7 @@ var keys = keyMap{
 		key.WithHelp("↓/j", "down"),
 	),
 	Enter: key.NewBinding(
-		key.WithKeys("enter", "l", "right"),
+		key.WithKeys("enter", "right"),
 		key.WithHelp("enter", "drill in"),
 	),
 	Back: key.NewBinding(
@@ -63,8 +63,8 @@ var keys = keyMap{
 		key.WithHelp("r", "restart"),
 	),
 	Logs: key.NewBinding(
-		key.WithKeys("L"),
-		key.WithHelp("L", "logs"),
+		key.WithKeys("l", "L"),
+		key.WithHelp("l", "logs"),
 	),
 	Shell: key.NewBinding(
 		key.WithKeys("s"),
@@ -90,9 +90,11 @@ var keys = keyMap{
 	),
 }
 
-// Note: Enter binds "l"/right and Back binds "h"/left so vi-style horizontal
-// motion zooms the stack, matching ↑/↓ + j/k for vertical motion. "L" (capital)
-// is the logs hint to avoid colliding with the lowercase "l" drill-in.
+// Note: the four op keys are all lowercase — [d]eploy [r]estart [l]ogs [s]hell —
+// for a consistent footer strip. Logs takes lowercase "l" (capital "L" stays a
+// back-compat alias), so "l" was dropped from Enter's drill-in: users pressed
+// "l" expecting logs and instead drilled into the pods view. Drill-in is now
+// Enter/→; Back keeps "h"/left for vi-style zoom-out.
 
 // ShortHelp / FullHelp implement help.KeyMap so bubbles/help can render the
 // footer. ShortHelp is the one-line strip; FullHelp is the `?` expansion.

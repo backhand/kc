@@ -12,7 +12,7 @@ import (
 // palette and the deploy rollout look (rolloutLine) so restart's rollout view is
 // visually identical to deploy's.
 
-// renderOpHints renders the "[d]eploy [r]estart [L]ogs [s]hell" footer strip.
+// renderOpHints renders the "[d]eploy [r]estart [l]ogs [s]hell" footer strip.
 // Deploy brightens when a deploy is available (a namespace/deployment view with
 // deployments); restart/logs/shell brighten when an op target is selectable (a
 // namespace or pods view) — otherwise faint.
@@ -21,9 +21,9 @@ func (m Model) renderOpHints() string {
 	if m.deployContextAvailable() {
 		deployHint = hintStyle.Render("[d]eploy")
 	}
-	rls := footerStyle.Render("[r]estart [L]ogs [s]hell")
+	rls := footerStyle.Render("[r]estart [l]ogs [s]hell")
 	if m.opContextAvailable() {
-		rls = hintStyle.Render("[r]estart [L]ogs [s]hell")
+		rls = hintStyle.Render("[r]estart [l]ogs [s]hell")
 	}
 	return deployHint + " " + rls
 }
