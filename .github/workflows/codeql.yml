@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v6
 
       # Build with the go.mod version so autobuild doesn't trip on an old runner Go.
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
