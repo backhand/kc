@@ -1,0 +1,4 @@
+# compiled binaries
+/kc
+/kc-linux-amd64
+/kc-darwin-*
