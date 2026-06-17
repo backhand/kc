@@ -5,22 +5,32 @@ on:
     tags:
       - "v*"
 
+# Least privilege at the top; the release job escalates only what it needs
+# (Scorecard Token-Permissions). Actions are pinned to commit SHAs.
 permissions:
-  contents: write # create the GitHub release on this repo
+  contents: read
 
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub release on this repo
+      id-token: write # keyless cosign signing + build provenance (OIDC)
+      attestations: write # actions/attest-build-provenance
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0 # full history so the changelog can be built
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
           go-version-file: go.mod
 
-      - uses: goreleaser/goreleaser-action@v6
+      # cosign signs the release checksums (keyless, via the GitHub OIDC token);
+      # goreleaser's `signs` block invokes it. See .goreleaser.yaml.
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - uses: goreleaser/goreleaser-action@5daf1e915a5f0af01ddbcd89a43b8061ff4f1a89 # v7.2.2
         with:
           distribution: goreleaser
           version: "~> v2"
@@ -28,7 +38,15 @@ jobs:
         env:
           # GITHUB_TOKEN releases on backhand/kc.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # HOMEBREW_TAP_TOKEN (a PAT) lets goreleaser push the formula to the
+          # HOMEBREW_TAP_TOKEN (a PAT) lets goreleaser push the cask to the
           # separate backhand/homebrew-tap repo. Set it in repo Settings →
           # Secrets → Actions. See RELEASING.md.
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      # SLSA build provenance for the archives + checksums (GitHub-native).
+      # Verify with: gh attestation verify <file> --repo backhand/kc
+      - uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/checksums.txt

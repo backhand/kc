@@ -29,8 +29,16 @@ git push origin v0.1.0
 The `release` workflow then:
 
 1. builds static `kc` binaries for darwin/linux × amd64/arm64,
-2. creates the GitHub release with the archives, `checksums.txt`, and `install.sh`,
-3. writes the cask (`Casks/kc.rb`) to `backhand/homebrew-tap`.
+2. cosign-signs `checksums.txt` (keyless) — `checksums.txt.sig` + `.pem` ship as
+   release assets,
+3. creates the GitHub release with the archives, `checksums.txt` (+ signatures),
+   and `install.sh`,
+4. attaches SLSA build provenance for the archives + checksums,
+5. writes the cask (`Casks/kc.rb`) to `backhand/homebrew-tap`.
+
+Signing and provenance are **keyless** (Sigstore + the workflow's OIDC token) —
+no extra secrets beyond `HOMEBREW_TAP_TOKEN`. See [`SECURITY.md`](./SECURITY.md)
+for how users verify a download.
 
 Users install with:
 
