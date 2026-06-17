@@ -110,6 +110,12 @@ type Model struct {
 	// confirm-gated `kubectl rollout restart` is the only mutation it fires.
 	restartModal *restartState
 
+	// scaleModal is the active scale flow (the `s` op), or nil. Like the other
+	// modals it owns key handling + rendering while set. The confirm-gated
+	// `kubectl scale --replicas=N` (per checked deployment) is the only mutation
+	// it fires.
+	scaleModal *scaleState
+
 	quitting bool
 }
 

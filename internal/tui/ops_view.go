@@ -12,18 +12,19 @@ import (
 // palette and the deploy rollout look (rolloutLine) so restart's rollout view is
 // visually identical to deploy's.
 
-// renderOpHints renders the "[d]eploy [r]estart [l]ogs [s]hell" footer strip.
-// Deploy brightens when a deploy is available (a namespace/deployment view with
-// deployments); restart/logs/shell brighten when an op target is selectable (a
-// namespace or pods view) — otherwise faint.
+// renderOpHints renders the "[d]eploy [r]estart [l]ogs [s]cale [e]xec" footer
+// strip. Deploy brightens when a deploy is available (a namespace/deployment view
+// with deployments); restart/logs/scale/exec brighten when an op target is
+// selectable (a namespace or pods view) — otherwise faint. Scale is a deployment
+// op, so it brightens in the same group as restart/logs/exec.
 func (m Model) renderOpHints() string {
 	deployHint := footerStyle.Render("[d]eploy")
 	if m.deployContextAvailable() {
 		deployHint = hintStyle.Render("[d]eploy")
 	}
-	rls := footerStyle.Render("[r]estart [l]ogs [s]hell")
+	rls := footerStyle.Render("[r]estart [l]ogs [s]cale [e]xec")
 	if m.opContextAvailable() {
-		rls = hintStyle.Render("[r]estart [l]ogs [s]hell")
+		rls = hintStyle.Render("[r]estart [l]ogs [s]cale [e]xec")
 	}
 	return deployHint + " " + rls
 }

@@ -84,6 +84,29 @@ func TestSetImageArgs(t *testing.T) {
 	}
 }
 
+func TestScaleArgs(t *testing.T) {
+	// No context: `-n <ns> scale deployment/<d> --replicas=<N>`.
+	got := ScaleArgs(k8s.Options{}, "mailon", "responder", 3)
+	want := []string{"-n", "mailon", "scale", "deployment/responder", "--replicas=3"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ScaleArgs =\n  %v\nwant\n  %v", got, want)
+	}
+
+	// replicas=0 is an explicit pause (scale-to-zero): the argv is --replicas=0.
+	got = ScaleArgs(k8s.Options{}, "mailon", "responder", 0)
+	want = []string{"-n", "mailon", "scale", "deployment/responder", "--replicas=0"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("scale-to-zero ScaleArgs =\n  %v\nwant\n  %v", got, want)
+	}
+
+	// Context prepends --context (mirrors the other builders' shape).
+	got = ScaleArgs(k8s.Options{Context: "k3s"}, "mailon", "sender", 5)
+	want = []string{"--context", "k3s", "-n", "mailon", "scale", "deployment/sender", "--replicas=5"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("context ScaleArgs =\n  %v\nwant\n  %v", got, want)
+	}
+}
+
 func TestRolloutStatusArgs(t *testing.T) {
 	got := RolloutStatusArgs(k8s.Options{}, "mailon", "web", 0)
 	want := []string{"-n", "mailon", "rollout", "status", "deployment/web"}
@@ -194,6 +217,43 @@ func TestRolloutRestart_DryRunArgv(t *testing.T) {
 	want := []string{"-n", "mailon", "rollout", "restart", "deployment/responder", "--dry-run=server"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("dry-run argv =\n  %v\nwant\n  %v", got, want)
+	}
+}
+
+func TestScale_InvokesKubectlWithCorrectArgv(t *testing.T) {
+	cap := &captureRunner{res: exec.RunResult{Stdout: "deployment.apps/responder scaled"}}
+	_, err := Scale(context.Background(), k8s.Options{Kubeconfig: "/tmp/kc"}, "mailon", "responder", 3,
+		ScaleOpts{Runner: cap.run})
+	if err != nil {
+		t.Fatalf("Scale: %v", err)
+	}
+	if len(cap.calls) != 1 {
+		t.Fatalf("expected 1 kubectl call, got %d", len(cap.calls))
+	}
+	c := cap.calls[0]
+	if c.command != "kubectl" {
+		t.Errorf("command = %q, want kubectl", c.command)
+	}
+	want := []string{"-n", "mailon", "scale", "deployment/responder", "--replicas=3"}
+	if !reflect.DeepEqual(c.args, want) {
+		t.Errorf("argv =\n  %v\nwant\n  %v", c.args, want)
+	}
+	// KUBECONFIG threaded into the exec env (same as SetImage / RolloutRestart).
+	if len(c.opts.Env) != 1 || c.opts.Env[0] != "KUBECONFIG=/tmp/kc" {
+		t.Errorf("env = %v, want [KUBECONFIG=/tmp/kc]", c.opts.Env)
+	}
+}
+
+func TestScale_ToZeroArgv(t *testing.T) {
+	cap := &captureRunner{}
+	_, err := Scale(context.Background(), k8s.Options{}, "mailon", "responder", 0, ScaleOpts{Runner: cap.run})
+	if err != nil {
+		t.Fatalf("Scale to zero: %v", err)
+	}
+	got := cap.calls[0].args
+	want := []string{"-n", "mailon", "scale", "deployment/responder", "--replicas=0"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("scale-to-zero argv =\n  %v\nwant\n  %v", got, want)
 	}
 }
 

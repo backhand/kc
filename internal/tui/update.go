@@ -50,6 +50,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case restartStepMsg:
 		return m.onRestartStep(msg), nil
 
+	case scaleStepMsg:
+		return m.onScaleStep(msg), nil
+
 	case execFinishedMsg:
 		// A suspended logs/shell session returned (Ctrl-C / shell exit / spawn
 		// error). The TUI is already restored by tea.ExecProcess; trigger a fresh
@@ -81,6 +84,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.restartModal != nil {
 		return m.handleRestartKey(msg)
 	}
+	// The scale modal likewise owns keys until dismissed (esc/enter).
+	if m.scaleModal != nil {
+		return m.handleScaleKey(msg)
+	}
 
 	switch {
 	case key.Matches(msg, keys.Quit):
@@ -99,6 +106,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Logs):
 		return m.runLogs()
+
+	case key.Matches(msg, keys.Scale):
+		return m.openScale()
 
 	case key.Matches(msg, keys.Shell):
 		return m.runShell()

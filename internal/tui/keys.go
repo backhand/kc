@@ -5,7 +5,7 @@ import "github.com/charmbracelet/bubbles/key"
 // keyMap holds every binding so the help text (bubbles/help) stays in lockstep
 // with the actual handlers. The contextual operation keys all act on the
 // workload selected in the current view — a deployment (namespace view) or a pod
-// (pods view): [d]eploy, [r]estart, [l]ogs, [s]hell (SPEC "Operations").
+// (pods view): [d]eploy, [r]estart, [l]ogs, [s]cale, [e]xec (SPEC "Operations").
 type keyMap struct {
 	Up    key.Binding
 	Down  key.Binding
@@ -18,7 +18,8 @@ type keyMap struct {
 	Deploy  key.Binding // opens the deploy modal (confirm-gated mutation)
 	Restart key.Binding // `kubectl rollout restart` (confirm-gated mutation)
 	Logs    key.Binding // streams logs via tea.ExecProcess (read-only)
-	Shell   key.Binding // interactive shell via tea.ExecProcess
+	Scale   key.Binding // opens the scale modal (confirm-gated mutation)
+	Shell   key.Binding // interactive exec/shell via tea.ExecProcess
 
 	// Deploy-modal bindings. Space toggles the focused row's checkbox; Confirm
 	// advances a phase / fires the (confirm-gated) apply; Cancel backs out a
@@ -66,9 +67,13 @@ var keys = keyMap{
 		key.WithKeys("l", "L"),
 		key.WithHelp("l", "logs"),
 	),
-	Shell: key.NewBinding(
+	Scale: key.NewBinding(
 		key.WithKeys("s"),
-		key.WithHelp("s", "shell"),
+		key.WithHelp("s", "scale"),
+	),
+	Shell: key.NewBinding(
+		key.WithKeys("e"),
+		key.WithHelp("e", "exec"),
 	),
 
 	// ── Deploy-modal bindings ──
@@ -90,11 +95,13 @@ var keys = keyMap{
 	),
 }
 
-// Note: the four op keys are all lowercase — [d]eploy [r]estart [l]ogs [s]hell —
-// for a consistent footer strip. Logs takes lowercase "l" (capital "L" stays a
-// back-compat alias), so "l" was dropped from Enter's drill-in: users pressed
-// "l" expecting logs and instead drilled into the pods view. Drill-in is now
-// Enter/→; Back keeps "h"/left for vi-style zoom-out.
+// Note: the op keys are all lowercase — [d]eploy [r]estart [l]ogs [s]cale [e]xec
+// — for a consistent footer strip. Scale took "s" (formerly shell), so the
+// interactive shell moved to "e" (exec) — its underlying op is still `kubectl
+// exec -it … -- sh`, only the key + label changed. Logs takes lowercase "l"
+// (capital "L" stays a back-compat alias), so "l" was dropped from Enter's
+// drill-in: users pressed "l" expecting logs and instead drilled into the pods
+// view. Drill-in is now Enter/→; Back keeps "h"/left for vi-style zoom-out.
 
 // ShortHelp / FullHelp implement help.KeyMap so bubbles/help can render the
 // footer. ShortHelp is the one-line strip; FullHelp is the `?` expansion.
@@ -105,7 +112,7 @@ func (k keyMap) ShortHelp() []key.Binding {
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Enter, k.Back},
-		{k.Deploy, k.Restart, k.Logs, k.Shell},
+		{k.Deploy, k.Restart, k.Logs, k.Scale, k.Shell},
 		{k.Help, k.Quit},
 	}
 }

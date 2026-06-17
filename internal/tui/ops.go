@@ -19,14 +19,16 @@ import (
 //	    mutation, like deploy), then watched via the existing rollout view.
 //	[L] logs    — `kubectl logs <target> --all-containers --tail=200 -f`,
 //	    read-only, streamed by handing the terminal to kubectl (tea.ExecProcess).
-//	[s] shell   — `kubectl exec -it <target> -- sh`, interactive, also via
+//	[e] exec    — `kubectl exec -it <target> -- sh`, interactive, also via
 //	    tea.ExecProcess (suspend the TUI → interact → resume on exit).
 //
-// All three resolve a single contextual target from the current view: the
-// selected deployment in a namespace view, or the selected pod in a pods view
-// (restart in the pods view targets the pod's PARENT deployment). The kubectl
-// argv is built by the pure k8s.LogsArgs / k8s.ExecArgs / deploy.RolloutRestart*
-// helpers so it is unit-testable without spawning anything.
+// (The set-based [s]cale op — `kubectl scale --replicas=N` — lives in scale.go.)
+//
+// These resolve a single contextual target from the current view: the selected
+// deployment in a namespace view, or the selected pod in a pods view (restart in
+// the pods view targets the pod's PARENT deployment). The kubectl argv is built
+// by the pure k8s.LogsArgs / k8s.ExecArgs / deploy.RolloutRestart* helpers so it
+// is unit-testable without spawning anything.
 
 // opTarget is the resolved subject of an operation in the current view.
 type opTarget struct {
@@ -81,8 +83,9 @@ func (m Model) opTarget() (opTarget, bool) {
 	}
 }
 
-// opContextAvailable reports whether r/L/s would act from the current view (a
-// namespace or pods view with a selectable row). Used to highlight the footer.
+// opContextAvailable reports whether the deployment/pod ops (restart, logs,
+// scale, exec) would act from the current view (a namespace or pods view with a
+// selectable row). Used to highlight the footer.
 func (m Model) opContextAvailable() bool {
 	_, ok := m.opTarget()
 	return ok
@@ -154,18 +157,23 @@ func (m Model) openRestart() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// restartPresets are the learned deployment-sets restart preselects from. We use
-// DEPLOY's presets (DeployPresets): they represent "sets deployed together",
-// which is exactly the set a user typically wants to restart together — and on a
-// fresh install restart has no history of its own yet. Restart STILL records its
-// own sets (recordRestart), so a "restart" history accrues for future use; we
-// just don't read it back yet to avoid a cold-start with no chips.
-func (m Model) restartPresets(ns string) [][]string {
+// opPresets are the learned deployment-sets a set-based op (restart / scale)
+// preselects from. We reuse DEPLOY's presets (DeployPresets): they represent
+// "sets deployed together", which is exactly the set a user typically wants to
+// restart or scale together — and on a fresh install neither restart nor scale
+// has a history of its own yet. Each op STILL records its own sets (recordRestart
+// / recordScale), so a per-action history accrues for future use; we just don't
+// read those back yet, to avoid a cold-start with no chips.
+func (m Model) opPresets(ns string) [][]string {
 	if m.deps.History == nil {
 		return nil
 	}
 	return m.deps.History.DeployPresets(m.deployScope(ns))
 }
+
+// restartPresets are the learned deployment-sets restart preselects from — see
+// opPresets (restart and scale share deploy's presets).
+func (m Model) restartPresets(ns string) [][]string { return m.opPresets(ns) }
 
 // handleRestartKey routes a key to the active restart phase. esc backs out a
 // phase (and closes from the first), so the user can never get stuck.
@@ -300,7 +308,8 @@ func (m Model) runLogs() (tea.Model, tea.Cmd) {
 
 // runShell opens an interactive shell into the target via `kubectl exec -it …
 // -- sh`, handed to the terminal with tea.ExecProcess (suspend → interact →
-// resume on exit). In a pods view it execs into the exact selected pod; in a
+// resume on exit). Bound to `e` (exec) since `s` is now scale; the underlying op
+// is unchanged. In a pods view it execs into the exact selected pod; in a
 // namespace view kubectl picks a pod of the deployment. A no-op outside a
 // workload view.
 func (m Model) runShell() (tea.Model, tea.Cmd) {

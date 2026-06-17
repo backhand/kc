@@ -96,6 +96,9 @@ func (m Model) View() string {
 	if m.restartModal != nil {
 		return m.renderRestartModal()
 	}
+	if m.scaleModal != nil {
+		return m.renderScaleModal()
+	}
 	top := *m.top()
 
 	var b strings.Builder

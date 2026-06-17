@@ -264,6 +264,236 @@ func restartTarget(args []string) string {
 	return ""
 }
 
+// ── Scale (confirm-gated mutation, set-based) ──────────────────────────────────
+//
+// Scale mirrors restart's set-select flow but swaps the confirm-only step for a
+// replica-count step (which doubles as the confirm). These tests drive that flow
+// and assert `kubectl scale … --replicas=N` fires for EACH selected deployment via
+// the MOCKED runner — NEVER a real cluster — including a replicas=0 case, and that
+// NOTHING runs before the apply (the confirm-gate).
+
+// TestScale_NamespaceViewSelectSetReplicasAndArgv is the safety-critical scale
+// test: `s` in the namespace view opens the SELECT phase (focused set
+// preselected); we add the second deployment, advance to the replicas screen,
+// type a count, Enter, and assert the EXACT `kubectl scale … --replicas=N` (+
+// `rollout status` watch) argv fires for EACH selected deployment via the mocked
+// runner — and that ZERO kubectl ran before the apply.
+func TestScale_NamespaceViewSelectSetReplicasAndArgv(t *testing.T) {
+	deps, runner, _, _ := opsHarness(t)
+	tm := onMailonNamespace(t, deps)
+
+	tm.Send(runeMsg('s')) // open scale SELECT (responder preselected — focused, no history)
+	waitFor(t, tm, "scale — mailon", "select deployments to scale", "responder", "sender")
+
+	// Nothing has touched kubectl yet (the select phase is pre-mutation).
+	if calls := runner.snapshot(); len(calls) != 0 {
+		t.Fatalf("kubectl invoked in the scale select phase: %v", calls)
+	}
+
+	// Add sender to the set (responder is already preselected), then advance.
+	tm.Send(runeMsg('j')) // → sender row
+	tm.Send(spaceMsg())   // check sender (now {responder, sender})
+	tm.Send(enterMsg())   // → replicas screen (the confirm step)
+	waitFor(t, tm, "set the target replica count", "deployment/responder", "deployment/sender", "kubectl scale")
+
+	// Still nothing run (confirm-gated): browsing to the replica screen is pre-apply.
+	if calls := runner.snapshot(); len(calls) != 0 {
+		t.Fatalf("kubectl invoked before the scale apply: %v", calls)
+	}
+
+	// Type the target count: clear the default (digit handling resets a leading 0;
+	// here the default is "2", so just append → "23"? No — backspace then type 3).
+	tm.Send(backspaceMsg()) // delete the default digit
+	tm.Send(runeMsg('3'))   // → "3"
+	waitFor(t, tm, "replicas: 3")
+
+	tm.Send(enterMsg()) // SCALE (confirm-gated mutation) → per-deployment rollout
+	waitFor(t, tm, "rollout", "responder", "sender", "done")
+
+	tm.Send(escMsg()) // close
+	tm.Send(runeMsg('q'))
+	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+
+	// `scale --replicas=3` + `rollout status` fired for EACH selected deployment.
+	calls := runner.snapshot()
+	scale := map[string][]string{}
+	status := map[string][]string{}
+	for _, c := range calls {
+		target := restartTarget(c)
+		if target == "" {
+			continue
+		}
+		if contains2(c, "scale") {
+			scale[target] = c
+		}
+		if contains2(c, "rollout") && contains2(c, "status") {
+			status[target] = c
+		}
+	}
+	for _, dep := range []string{"responder", "sender"} {
+		wantScale := []string{"--context", "k3s", "-n", "mailon", "scale", "deployment/" + dep, "--replicas=3"}
+		if !reflect.DeepEqual(scale["deployment/"+dep], wantScale) {
+			t.Errorf("scale argv for %s =\n  %v\nwant\n  %v", dep, scale["deployment/"+dep], wantScale)
+		}
+		wantStatus := []string{"--context", "k3s", "-n", "mailon", "rollout", "status", "deployment/" + dep, "--timeout=5m0s"}
+		if !reflect.DeepEqual(status["deployment/"+dep], wantStatus) {
+			t.Errorf("rollout status argv for %s =\n  %v\nwant\n  %v", dep, status["deployment/"+dep], wantStatus)
+		}
+	}
+}
+
+// TestScale_ToZero asserts the explicit pause path: scale a single deployment to
+// 0 replicas. The replica field accepts "0" and the apply fires
+// `kubectl scale … --replicas=0` (the SPEC's pause-then-resume goal, zero end).
+func TestScale_ToZero(t *testing.T) {
+	deps, runner, _, _ := opsHarness(t)
+	tm := onMailonNamespace(t, deps)
+
+	tm.Send(runeMsg('s')) // open scale SELECT (responder preselected)
+	waitFor(t, tm, "select deployments to scale", "responder")
+	tm.Send(enterMsg()) // → replicas screen (just {responder})
+	waitFor(t, tm, "set the target replica count", "deployment/responder")
+
+	// Default is responder's DesiredReplicas (2); backspace then type 0 → "0".
+	tm.Send(backspaceMsg())
+	tm.Send(runeMsg('0'))
+	waitFor(t, tm, "replicas: 0", "scale to zero")
+
+	tm.Send(enterMsg()) // SCALE TO ZERO
+	waitFor(t, tm, "rollout", "responder", "done")
+
+	tm.Send(escMsg())
+	tm.Send(runeMsg('q'))
+	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+
+	var scale []string
+	for _, c := range runner.snapshot() {
+		if contains2(c, "scale") {
+			scale = c
+		}
+	}
+	want := []string{"--context", "k3s", "-n", "mailon", "scale", "deployment/responder", "--replicas=0"}
+	if !reflect.DeepEqual(scale, want) {
+		t.Errorf("scale-to-zero argv =\n  %v\nwant\n  %v", scale, want)
+	}
+}
+
+// TestScale_DefaultsToCurrentDesiredReplicas asserts the replica field opens
+// pre-filled at the focused deployment's current DesiredReplicas (responder = 2),
+// a sensible starting point the user adjusts ("predict, then confirm").
+func TestScale_DefaultsToCurrentDesiredReplicas(t *testing.T) {
+	deps, _, _, _ := opsHarness(t)
+	tm := onMailonNamespace(t, deps)
+
+	tm.Send(runeMsg('s')) // open scale SELECT
+	waitFor(t, tm, "select deployments to scale")
+	tm.Send(enterMsg()) // → replicas screen
+	// responder's DesiredReplicas is 2 (mailonDeployments fixture).
+	waitFor(t, tm, "replicas: 2")
+
+	tm.Send(ctrlCMsg())
+	m := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second)).(Model)
+	if m.scaleModal == nil || m.scaleModal.replicas != "2" {
+		t.Fatalf("replica field = %q, want \"2\" (responder's current DesiredReplicas)", m.scaleModal.replicas)
+	}
+}
+
+// TestScale_EscOnReplicasBacksToSelect asserts esc on the replicas screen steps
+// back to select (reversible) and that NOTHING ran (defence-in-depth for the
+// confirm gate: the mutation only fires on Enter at the replicas screen).
+func TestScale_EscOnReplicasBacksToSelect(t *testing.T) {
+	deps, runner, _, _ := opsHarness(t)
+	tm := onMailonNamespace(t, deps)
+
+	tm.Send(runeMsg('s')) // open scale SELECT
+	waitFor(t, tm, "select deployments to scale")
+	tm.Send(enterMsg()) // → replicas
+	waitFor(t, tm, "set the target replica count")
+	tm.Send(escMsg()) // back to select (still nothing run)
+	waitFor(t, tm, "select deployments to scale")
+
+	if calls := runner.snapshot(); len(calls) != 0 {
+		t.Fatalf("esc on the replicas screen must not run kubectl; calls=%v", calls)
+	}
+
+	tm.Send(ctrlCMsg())
+	m := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second)).(Model)
+	if m.scaleModal == nil || m.scaleModal.phase != scaleSelect {
+		t.Fatalf("expected to be back on the scale select phase, modal=%+v", m.scaleModal)
+	}
+}
+
+// TestScale_EscOnSelectCancelsBeforeMutation asserts esc on the SELECT phase
+// closes the modal WITHOUT running anything (the confirm-gate guarantee).
+func TestScale_EscOnSelectCancelsBeforeMutation(t *testing.T) {
+	deps, runner, _, _ := opsHarness(t)
+	tm := onMailonNamespace(t, deps)
+
+	tm.Send(runeMsg('s')) // open scale SELECT
+	waitFor(t, tm, "select deployments to scale", "responder")
+	tm.Send(escMsg()) // cancel from select → back to the namespace view
+	waitFor(t, tm, "DEPLOYMENT", "mailon · [user]")
+
+	tm.Send(runeMsg('q'))
+	m := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second)).(Model)
+	if m.scaleModal != nil {
+		t.Error("scale modal should be closed after esc on select")
+	}
+	if calls := runner.snapshot(); len(calls) != 0 {
+		t.Fatalf("esc must not run kubectl; calls=%v", calls)
+	}
+}
+
+// TestScale_RecordsSetIntoLearningStore asserts the scaled set is recorded under
+// the "scale" action ({deployments: [...]}) so a scale history accrues (SPEC).
+func TestScale_RecordsSetIntoLearningStore(t *testing.T) {
+	deps, _, _, hist := opsHarness(t)
+	tm := onMailonNamespace(t, deps)
+
+	tm.Send(runeMsg('s')) // open scale SELECT (responder preselected)
+	waitFor(t, tm, "select deployments to scale")
+	tm.Send(enterMsg()) // → replicas
+	waitFor(t, tm, "set the target replica count")
+	tm.Send(enterMsg()) // SCALE (default replicas) → fires the mutation + records
+	waitFor(t, tm, "rollout", "done")
+
+	tm.Send(escMsg())
+	tm.Send(runeMsg('q'))
+	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+
+	// The scale action recorded the set under the "scale" key ({deployments:[...]}),
+	// in the same shape deploy/restart use — so a scale history accrues (SPEC).
+	scope := store.Scope{Cluster: testCluster, App: "mailon"}
+	ranked := hist.Ranked("scale", scope)
+	if len(ranked) == 0 {
+		t.Fatalf("expected the scaled set to be recorded under the scale action; got none")
+	}
+	raw, ok := ranked[0]["deployments"].([]any)
+	if !ok || len(raw) != 1 || raw[0] != "responder" {
+		t.Errorf("recorded scale set = %v, want [responder]", ranked[0]["deployments"])
+	}
+}
+
+// TestScale_SOpensScaleNotShell is the keymap regression test: `s` opens the
+// scale modal (NOT a shell). The shell op moved to `e`; `s` must NEVER build an
+// exec command.
+func TestScale_SOpensScaleNotShell(t *testing.T) {
+	deps, _, captured, _ := opsHarness(t)
+	tm := onMailonNamespace(t, deps)
+
+	tm.Send(runeMsg('s')) // s → scale modal (previously shell)
+	waitFor(t, tm, "scale — mailon", "select deployments to scale")
+
+	tm.Send(ctrlCMsg())
+	m := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second)).(Model)
+	if m.scaleModal == nil {
+		t.Error("s should open the scale modal")
+	}
+	if c := captured.last(); c != nil {
+		t.Errorf("s must NOT build a shell/exec command; got %v", c.Args)
+	}
+}
+
 // ── Logs / shell (interactive, ExecProcess) ───────────────────────────────────
 
 // TestLogs_NamespaceViewBuildsDeploymentCmd asserts lowercase `l` in the
@@ -326,14 +556,14 @@ func TestLogs_LowercaseLOpensLogsNotDrillIn(t *testing.T) {
 	}
 }
 
-// TestShell_NamespaceViewBuildsDeploymentExec asserts `s` in the namespace view
-// builds `kubectl exec -it deployment/<d> -- sh` (kubectl picks a pod of the
-// deployment), captured WITHOUT opening a real shell.
+// TestShell_NamespaceViewBuildsDeploymentExec asserts `e` (exec — formerly `s`)
+// in the namespace view builds `kubectl exec -it deployment/<d> -- sh` (kubectl
+// picks a pod of the deployment), captured WITHOUT opening a real shell.
 func TestShell_NamespaceViewBuildsDeploymentExec(t *testing.T) {
 	deps, _, captured, _ := opsHarness(t)
 	tm := onMailonNamespace(t, deps)
 
-	tm.Send(runeMsg('s'))
+	tm.Send(runeMsg('e')) // exec (the key formerly bound to `s`)
 	cmd := waitForExec(t, captured)
 
 	assertKubectl(t, cmd, []string{
@@ -344,15 +574,16 @@ func TestShell_NamespaceViewBuildsDeploymentExec(t *testing.T) {
 	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 }
 
-// TestShell_PodsViewExecsSelectedPod asserts `s` in the pods view execs into the
-// EXACT selected pod (move to the 2nd pod first to prove cursor→target wiring).
+// TestShell_PodsViewExecsSelectedPod asserts `e` (exec) in the pods view execs
+// into the EXACT selected pod (move to the 2nd pod first to prove cursor→target
+// wiring).
 func TestShell_PodsViewExecsSelectedPod(t *testing.T) {
 	deps, _, captured, _ := opsHarness(t)
 	tm := onResponderPods(t, deps)
 
 	tm.Send(runeMsg('j')) // move to the 2nd pod (responder-bbb)
 	waitFor(t, tm, "responder-bbb")
-	tm.Send(runeMsg('s'))
+	tm.Send(runeMsg('e')) // exec
 	cmd := waitForExec(t, captured)
 
 	assertKubectl(t, cmd, []string{
@@ -363,22 +594,27 @@ func TestShell_PodsViewExecsSelectedPod(t *testing.T) {
 	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 }
 
-// TestOps_NoTargetInOverviewIsNoOp asserts r/L/s do nothing in the overview
-// (no workload selected) — no modal, no captured exec, no kubectl.
+// TestOps_NoTargetInOverviewIsNoOp asserts the deployment/pod ops (restart, logs,
+// scale, exec) do nothing in the overview (no workload selected) — no modal, no
+// captured exec, no kubectl.
 func TestOps_NoTargetInOverviewIsNoOp(t *testing.T) {
 	deps, runner, captured, _ := opsHarness(t)
 	deps.Entry = Entry{} // plain all-namespaces entry (no resolution)
 	tm := teatest.NewTestModel(t, New(deps), teatest.WithInitialTermSize(120, 40))
 	waitFor(t, tm, "all-namespaces", "NAMESPACE")
 
-	tm.Send(runeMsg('r'))
-	tm.Send(runeMsg('L'))
-	tm.Send(runeMsg('s'))
+	tm.Send(runeMsg('r')) // restart
+	tm.Send(runeMsg('L')) // logs
+	tm.Send(runeMsg('s')) // scale
+	tm.Send(runeMsg('e')) // exec
 
 	tm.Send(runeMsg('q'))
 	m := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second)).(Model)
 	if m.restartModal != nil {
 		t.Error("restart modal should not open in the overview (no workload selected)")
+	}
+	if m.scaleModal != nil {
+		t.Error("scale modal should not open in the overview (no workload selected)")
 	}
 	if c := captured.last(); c != nil {
 		t.Errorf("no exec command should be built in the overview; got %v", c.Args)

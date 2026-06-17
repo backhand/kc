@@ -1,14 +1,15 @@
 // Package deploy holds the mutating code in kc: the imperative `kubectl set
 // image` that the confirm-gated deploy flow runs, the `kubectl rollout restart`
-// the restart op runs, plus the `kubectl rollout status` both watch afterwards
-// (SPEC "Deploy flow (v1)" / "Operations").
+// the restart op runs, the `kubectl scale` the scale op runs, plus the `kubectl
+// rollout status` they all watch afterwards (SPEC "Deploy flow (v1)" /
+// "Operations").
 //
 // Everything else in kc is read-only. This package is deliberately tiny and
 // isolated so the mutation surface is auditable in one place.
 //
 //   - The argv is built by the pure SetImageArgs / RolloutRestartArgs /
-//     RolloutStatusArgs helpers, so the exact command can be asserted in a unit
-//     test (and dry-run-checked by a reviewer) without spawning anything.
+//     ScaleArgs / RolloutStatusArgs helpers, so the exact command can be asserted
+//     in a unit test (and dry-run-checked by a reviewer) without spawning anything.
 //   - Execution goes through an injectable Runner (default: exec.Run) so headless
 //     tests capture the constructed argv WITHOUT hitting a cluster.
 //   - The mutations (SetImage / RolloutRestart) support a server-side dry run
@@ -21,6 +22,7 @@ package deploy
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"time"
 
@@ -82,6 +84,14 @@ type RestartOpts struct {
 	Runner Runner
 }
 
+// ScaleOpts configures a single Scale call. Mirrors RestartOpts so the scale op
+// has the same injectable-runner surface as deploy/restart.
+type ScaleOpts struct {
+	// Runner overrides the executor (tests inject a capture func). Nil = the real
+	// exec.Run shell-out.
+	Runner Runner
+}
+
 // ContainerArg returns the kubectl container token for `set image`: the given
 // container name, or AllContainers ("*") when the name is empty. Trimmed.
 func ContainerArg(container string) string {
@@ -131,6 +141,25 @@ func RolloutRestartArgs(kopts k8s.Options, ns, deployment string, dryRun bool) [
 	if dryRun {
 		args = append(args, "--dry-run=server")
 	}
+	return args
+}
+
+// ScaleArgs builds the kubectl argv for scaling a deployment to a fixed replica
+// count — pure, so the exact command is unit-testable. Mirrors the other
+// builders' shape (context threaded first).
+//
+//	kubectl [--context <c>] -n <ns> scale deployment/<deployment> \
+//	    --replicas=<N>
+//
+// replicas=0 is a valid, explicit scale-to-zero (pause): the argv is
+// `--replicas=0` and the Deployment controller spins the pods down. Scaling back
+// up is the same call with N>0. There is no dry-run branch — `kubectl scale` is a
+// direct replica write, gated by the modal's confirm screen (the replica-count
+// step doubles as the confirm).
+func ScaleArgs(kopts k8s.Options, ns, deployment string, replicas int) []string {
+	args := contextArgs(kopts)
+	args = append(args, "-n", ns, "scale", "deployment/"+deployment,
+		"--replicas="+strconv.Itoa(replicas))
 	return args
 }
 
@@ -187,6 +216,25 @@ func RolloutRestart(ctx context.Context, kopts k8s.Options, ns, deployment strin
 		run = defaultRunner
 	}
 	args := RolloutRestartArgs(kopts, ns, deployment, o.DryRun)
+	return run(ctx, "kubectl", args, runOpts(kopts))
+}
+
+// Scale runs `kubectl scale … --replicas=<N>` to set a deployment's replica
+// count (the `s` op — SPEC "Operations"). This is a real mutation: it writes the
+// Deployment's spec.replicas and the controller reconciles to it. replicas=0 is
+// an explicit, valid pause (scale-to-zero); scaling back up is the same call with
+// N>0. After scaling, the scale op watches with RolloutStatus exactly like deploy
+// and restart (RolloutStatus returns promptly for replicas=0).
+//
+// Returns the captured kubectl output; an *exec.ExecError on failure. The
+// kubeconfig/context/timeout from kopts are threaded through exactly as SetImage
+// / RolloutRestart and the read-only wrappers do.
+func Scale(ctx context.Context, kopts k8s.Options, ns, deployment string, replicas int, o ScaleOpts) (exec.RunResult, error) {
+	run := o.Runner
+	if run == nil {
+		run = defaultRunner
+	}
+	args := ScaleArgs(kopts, ns, deployment, replicas)
 	return run(ctx, "kubectl", args, runOpts(kopts))
 }
 

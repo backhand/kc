@@ -132,9 +132,10 @@ func deployHarness(t *testing.T) (Deps, *recordingRunner, *store.ActionHistory) 
 	return deps, runner, hist
 }
 
-func spaceMsg() tea.Msg { return tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}} }
-func escMsg() tea.Msg   { return tea.KeyMsg{Type: tea.KeyEsc} }
-func enterMsg() tea.Msg { return tea.KeyMsg{Type: tea.KeyEnter} }
+func spaceMsg() tea.Msg     { return tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}} }
+func escMsg() tea.Msg       { return tea.KeyMsg{Type: tea.KeyEsc} }
+func enterMsg() tea.Msg     { return tea.KeyMsg{Type: tea.KeyEnter} }
+func backspaceMsg() tea.Msg { return tea.KeyMsg{Type: tea.KeyBackspace} }
 
 // ctrlCMsg hard-quits even while the modal is open (the modal swallows `q`), so
 // state-inspection tests can reach FinalModel without first closing the modal.
