@@ -5,6 +5,10 @@ on:
     branches: [master, main]
   pull_request:
 
+# Least privilege: CI only reads the repo (Scorecard Token-Permissions).
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest

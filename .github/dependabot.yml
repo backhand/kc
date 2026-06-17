@@ -1,0 +1,17 @@
+# Keep dependencies current so advisories get patched promptly. This is also a
+# tracked OpenSSF Scorecard signal (Dependency-Update-Tool / Maintained).
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci

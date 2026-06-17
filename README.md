@@ -1,5 +1,13 @@
 # kc
 
+[![ci](https://github.com/backhand/kc/actions/workflows/ci.yml/badge.svg)](https://github.com/backhand/kc/actions/workflows/ci.yml)
+[![codeql](https://github.com/backhand/kc/actions/workflows/codeql.yml/badge.svg)](https://github.com/backhand/kc/actions/workflows/codeql.yml)
+[![openssf scorecard](https://api.securityscorecards.dev/projects/github.com/backhand/kc/badge)](https://scorecard.dev/viewer/?uri=github.com/backhand/kc)
+[![go report card](https://goreportcard.com/badge/github.com/backhand/kc)](https://goreportcard.com/report/github.com/backhand/kc)
+[![go reference](https://pkg.go.dev/badge/github.com/backhand/kc.svg)](https://pkg.go.dev/github.com/backhand/kc)
+[![latest release](https://img.shields.io/github/v/release/backhand/kc?label=release)](https://github.com/backhand/kc/releases/latest)
+[![license: MIT](https://img.shields.io/github/license/backhand/kc)](./LICENSE)
+
 **kc** — *kubernetes commander.* A keyboard-driven, Midnight-Commander-style
 terminal UI for daily Kubernetes **operations**: browse the cluster, then
 deploy, restart, scale, tail logs, and exec — all from the keyboard, with

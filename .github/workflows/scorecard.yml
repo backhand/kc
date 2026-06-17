@@ -1,0 +1,50 @@
+# OpenSSF Scorecard — supply-chain security health metrics (branch protection,
+# pinned deps, token permissions, signed releases, SAST, …). publish_results
+# uploads the score to the public OpenSSF API, which powers the README badge and
+# lets anyone audit the repo at https://scorecard.dev/viewer/?uri=github.com/backhand/kc
+#
+# Scorecard's publish path is fussy on purpose: NO workflow-level write
+# permissions and no top-level env/defaults — only the analysis job may hold
+# id-token: write. Keep it that way.
+name: scorecard
+
+on:
+  push:
+    branches: [master]
+  schedule:
+    - cron: "32 4 * * 1" # weekly, Monday 04:32 UTC
+  branch_protection_rule: # re-score when branch protection changes
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write # upload the SARIF to code scanning
+      id-token: write # publish results to the OpenSSF API (enables the badge)
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # scorecard-action ships no moving major tag — pin the full version.
+      - uses: ossf/scorecard-action@v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true # required for the badge + public viewer
+
+      # Keep the raw SARIF as an artifact for debugging a score.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scorecard-results
+          path: results.sarif
+          retention-days: 5
+
+      # Surface findings in the Security tab too.
+      - uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results.sarif

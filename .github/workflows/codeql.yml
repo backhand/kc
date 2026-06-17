@@ -1,0 +1,38 @@
+# CodeQL code scanning (GitHub's SAST). Results land in the repo's Security tab;
+# the workflow's status badge is the public "this code is scanned" signal.
+name: codeql
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: "27 3 * * 1" # weekly, Monday 03:27 UTC — catches advisories on idle code
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: analyze (go)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write # upload results to code scanning
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build with the go.mod version so autobuild doesn't trip on an old runner Go.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: go
+          build-mode: autobuild
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:go"
