@@ -29,10 +29,9 @@ signature and provenance:
 # 1. checksum
 sha256sum -c checksums.txt --ignore-missing
 
-# 2. cosign signature over the checksums
+# 2. cosign signature over the checksums (Sigstore bundle)
 cosign verify-blob \
-  --certificate checksums.txt.pem \
-  --signature checksums.txt.sig \
+  --bundle checksums.txt.sigstore.json \
   --certificate-identity-regexp 'https://github.com/backhand/kc/.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   checksums.txt

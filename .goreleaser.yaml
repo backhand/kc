@@ -43,21 +43,19 @@ archives:
 checksum:
   name_template: checksums.txt
 
-# Keyless cosign signature over checksums.txt (Sigstore: Fulcio cert + Rekor
-# transparency log). Signing the checksum file transitively covers every
-# artifact, and ships checksums.txt.sig + checksums.txt.pem as release assets
-# (Scorecard Signed-Releases). The release workflow installs cosign and grants
-# id-token: write for the keyless OIDC flow. Verify per SECURITY.md.
+# Keyless cosign signature over checksums.txt. cosign v3 writes a single Sigstore
+# bundle (Fulcio cert + signature + Rekor entry) to checksums.txt.sigstore.json,
+# shipped as a release asset (Scorecard Signed-Releases). Signing the checksum
+# file transitively covers every artifact. The release workflow installs cosign
+# and grants id-token: write for the keyless OIDC flow. Verify per SECURITY.md.
 signs:
   - cmd: cosign
     artifacts: checksum
     output: true
-    certificate: "${artifact}.pem"
-    signature: "${artifact}.sig"
+    signature: "${artifact}.sigstore.json"
     args:
       - sign-blob
-      - "--output-certificate=${certificate}"
-      - "--output-signature=${signature}"
+      - "--bundle=${signature}"
       - "${artifact}"
       - "--yes"
 
