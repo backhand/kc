@@ -307,6 +307,14 @@ func TestParseDeployments_Fixture(t *testing.T) {
 	if web.Image.Tag != "v0.6.9" {
 		t.Errorf("web image tag = %q, want v0.6.9", web.Image.Tag)
 	}
+	// The owning container's name is captured on the image ref (the deploy flow's
+	// `kubectl set image <name>=…` relies on this).
+	if web.Image.Name != "web" {
+		t.Errorf("web image container name = %q, want web", web.Image.Name)
+	}
+	if len(web.Images) != 1 || web.Images[0].Name != "web" {
+		t.Errorf("web.Images = %+v, want one container named web", web.Images)
+	}
 	if web.DesiredReplicas != 2 {
 		t.Errorf("web desired = %d, want 2", web.DesiredReplicas)
 	}

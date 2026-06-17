@@ -40,6 +40,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case allDeploymentsLoadedMsg:
 		return m.onAllDeploymentsLoaded(msg), nil
+
+	case releasesLoadedMsg:
+		return m.onReleasesLoaded(msg), nil
+
+	case deployStepMsg:
+		return m.onDeployStep(msg), nil
 	}
 	return m, nil
 }
@@ -47,6 +53,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // ── Key handling ────────────────────────────────────────────────────────────
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Ctrl+C always hard-quits, even mid-modal (an escape hatch that never
+	// triggers a mutation — it just tears the program down).
+	if msg.Type == tea.KeyCtrlC {
+		m.quitting = true
+		return m, tea.Quit
+	}
+
+	// While the deploy modal is open it owns all other keys (its esc/cancel is
+	// the way out), so navigation/quit can't fire underneath it.
+	if m.deployModal != nil {
+		return m.handleDeployKey(msg)
+	}
+
 	switch {
 	case key.Matches(msg, keys.Quit):
 		m.quitting = true
@@ -55,6 +74,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Help):
 		m.showHelp = !m.showHelp
 		return m, nil
+
+	case key.Matches(msg, keys.Deploy):
+		return m.openDeploy()
 
 	case key.Matches(msg, keys.Up):
 		m.moveCursor(-1)

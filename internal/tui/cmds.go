@@ -8,16 +8,27 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/thinkpilot/infrastructure/tools/kc/internal/deploy"
+	"github.com/thinkpilot/infrastructure/tools/kc/internal/git"
+	"github.com/thinkpilot/infrastructure/tools/kc/internal/github"
 	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
 )
 
+// releaseLimit is how many latest releases the deploy modal shows per page
+// (SPEC: "5 latest GitHub releases").
+const releaseLimit = 5
+
 // Fetchers are the data-layer calls the TUI depends on, abstracted so tests can
-// inject deterministic fakes (offline, no kubectl). main uses realFetchers.
+// inject deterministic fakes (offline, no kubectl/gh). main uses realFetchers.
 type Fetchers struct {
 	Overview       func(ctx context.Context) (k8s.ClusterOverview, error)
 	Namespace      func(ctx context.Context, ns string) (k8s.NamespaceView, error)
 	DeploymentPods func(ctx context.Context, ns, deployment string) ([]k8s.Pod, error)
 	AllDeployments func(ctx context.Context) ([]k8s.Deployment, error)
+	// Releases fetches the latest annotated releases for a repo (deploy modal's
+	// version list). limit is how many to return; image is the GHCR image to
+	// probe availability against.
+	Releases func(ctx context.Context, repo git.RepoRef, image string, limit int) []github.ReleaseAnnotation
 }
 
 // realFetchers binds the data-layer functions to the given kube options.
@@ -34,6 +45,9 @@ func realFetchers(opts k8s.Options) Fetchers {
 		},
 		AllDeployments: func(ctx context.Context) ([]k8s.Deployment, error) {
 			return k8s.GetAllDeployments(ctx, opts)
+		},
+		Releases: func(ctx context.Context, repo git.RepoRef, image string, limit int) []github.ReleaseAnnotation {
+			return github.GetReleases(ctx, repo, github.Options{Limit: limit, GHCRImage: image})
 		},
 	}
 }
@@ -76,6 +90,23 @@ type allDeploymentsLoadedMsg struct {
 	deployments []k8s.Deployment
 	at          time.Time
 	err         error
+}
+
+// releasesLoadedMsg carries the deploy modal's annotated release list for a
+// page. page is the 0-based page it was fetched for, so a stale response for a
+// page the user has paged away from is ignored.
+type releasesLoadedMsg struct {
+	page     int
+	releases []github.ReleaseAnnotation
+	err      error
+}
+
+// deployStepMsg carries the result of one deployment's apply (`kubectl set
+// image`) + rollout-status watch. One per deployed deployment.
+type deployStepMsg struct {
+	deployment string
+	detail     string // a short success/status line for the rollout view
+	err        error
 }
 
 // tickMsg drives the periodic background refresh.
@@ -130,6 +161,73 @@ func (m Model) fetchAllDeployments() tea.Cmd {
 		deps, err := f(ctx)
 		return allDeploymentsLoadedMsg{deployments: deps, at: time.Now(), err: err}
 	}
+}
+
+// rolloutTimeout bounds a single `kubectl rollout status` watch. A rollout that
+// stalls past this surfaces as a failure in the rollout view rather than hanging
+// the tea.Cmd goroutine. Generous — image pulls can be slow.
+const rolloutTimeout = 5 * time.Minute
+
+// fetchReleases fetches one page of annotated releases for the deploy modal. The
+// data layer (internal/github) fetches the LATEST `limit` releases; we page back
+// by fetching `limit*(page+1)` and slicing the trailing window, so `o`lder shows
+// successively older releases without a cursor API in `gh`.
+func (m Model) fetchReleases(repo git.RepoRef, image string, limit, page int) tea.Cmd {
+	f := m.deps.Fetch.Releases
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+		defer cancel()
+		// Fetch enough to cover all pages up to and including this one, then take
+		// this page's window (newest page = 0).
+		all := f(ctx, repo, image, limit*(page+1))
+		start := page * limit
+		if start > len(all) {
+			start = len(all)
+		}
+		end := start + limit
+		if end > len(all) {
+			end = len(all)
+		}
+		return releasesLoadedMsg{page: page, releases: all[start:end]}
+	}
+}
+
+// runDeployStep applies one change with `kubectl set image` (THE mutation —
+// confirm-gated in the UI flow) and then watches its rollout with `kubectl
+// rollout status`. The injected Runner (tests' capture func, else exec.Run)
+// performs both, so headless tests assert argv without a cluster.
+func (m Model) runDeployStep(c deploy.Change) tea.Cmd {
+	kopts := m.deps.KubeOpts
+	runner := m.deps.Runner
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), rolloutTimeout+fetchTimeout)
+		defer cancel()
+
+		// 1) Apply the new image (the real, confirmed mutation).
+		if _, err := deploy.SetImage(ctx, kopts, c.Namespace, c.Deployment, c.Container, c.Image,
+			deploy.SetImageOpts{Runner: runner}); err != nil {
+			return deployStepMsg{deployment: c.Deployment, err: err}
+		}
+		// 2) Watch the rollout to completion.
+		res, err := deploy.RolloutStatus(ctx, kopts, c.Namespace, c.Deployment,
+			deploy.RolloutOpts{Timeout: rolloutTimeout, Runner: runner})
+		if err != nil {
+			return deployStepMsg{deployment: c.Deployment, err: err}
+		}
+		return deployStepMsg{deployment: c.Deployment, detail: lastLine(res.Stdout)}
+	}
+}
+
+// lastLine returns the last non-empty line of s (the meaningful tail of a
+// `rollout status` stream), or "" when there is none.
+func lastLine(s string) string {
+	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if l := strings.TrimSpace(lines[i]); l != "" {
+			return l
+		}
+	}
+	return ""
 }
 
 // fetchFor returns the fetch Cmd appropriate to a level's kind (nil for a group

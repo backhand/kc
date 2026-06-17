@@ -3,9 +3,9 @@ package tui
 import "github.com/charmbracelet/bubbles/key"
 
 // keyMap holds every binding so the help text (bubbles/help) stays in lockstep
-// with the actual handlers. The d/r/l/s operation keys are declared so they
-// appear in the footer hint, but they are NOT wired to any handler — operations
-// are step 4 (deploy/restart/logs/shell). They are intentionally inert here.
+// with the actual handlers. Deploy ([d]) is wired (step 4); the r/l/s operation
+// keys are declared so they appear in the footer hint, but are NOT wired to any
+// handler — they remain reserved-inert (restart/logs/shell, later steps).
 type keyMap struct {
 	Up    key.Binding
 	Down  key.Binding
@@ -14,11 +14,20 @@ type keyMap struct {
 	Help  key.Binding
 	Quit  key.Binding
 
-	// Reserved operation hints (step 4 — not handled yet).
-	Deploy  key.Binding
+	// Deploy ([d]) opens the deploy modal (step 4 — wired).
+	Deploy key.Binding
+	// Reserved operation hints (later steps — not handled yet).
 	Restart key.Binding
 	Logs    key.Binding
 	Shell   key.Binding
+
+	// Deploy-modal bindings. Space toggles the focused row's checkbox; Confirm
+	// advances a phase / fires the (confirm-gated) apply; Cancel backs out a
+	// phase or closes the modal. Older pages the version list back.
+	Toggle  key.Binding
+	Confirm key.Binding
+	Cancel  key.Binding
+	Older   key.Binding
 }
 
 var keys = keyMap{
@@ -61,6 +70,24 @@ var keys = keyMap{
 	Shell: key.NewBinding(
 		key.WithKeys("s"),
 		key.WithHelp("s", "shell"),
+	),
+
+	// ── Deploy-modal bindings ──
+	Toggle: key.NewBinding(
+		key.WithKeys(" "),
+		key.WithHelp("space", "toggle"),
+	),
+	Confirm: key.NewBinding(
+		key.WithKeys("enter"),
+		key.WithHelp("enter", "confirm"),
+	),
+	Cancel: key.NewBinding(
+		key.WithKeys("esc"),
+		key.WithHelp("esc", "cancel"),
+	),
+	Older: key.NewBinding(
+		key.WithKeys("o"),
+		key.WithHelp("o", "older"),
 	),
 }
 

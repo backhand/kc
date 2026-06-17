@@ -73,6 +73,11 @@ type Namespace struct {
 
 // ImageRef is a container image split into its repository, tag and digest.
 type ImageRef struct {
+	// Name is the owning container's name (from the pod spec). Empty when the
+	// ref was parsed standalone (e.g. via ParseImage) rather than off a
+	// deployment's containers. The deploy flow targets `kubectl set image
+	// deployment/<d> <Name>=<image>` so a sidecar is never clobbered.
+	Name string `json:"name,omitempty"`
 	// Raw is the full image string as deployed,
 	// e.g. "ghcr.io/thinkpilot/mailon:v0.6.9".
 	Raw string `json:"raw"`

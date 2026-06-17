@@ -64,10 +64,14 @@ func (m Model) headerHeight(l level) int {
 }
 
 // View renders the visible level: title, header, column header, the scrolled
-// row list, then the footer (breadcrumb + freshness + key hints).
+// row list, then the footer (breadcrumb + freshness + key hints). When the
+// deploy modal is open it takes over the whole frame.
 func (m Model) View() string {
 	if m.quitting {
 		return ""
+	}
+	if m.deployModal != nil {
+		return m.renderDeployModal()
 	}
 	top := *m.top()
 
@@ -339,8 +343,12 @@ func (m Model) renderFooter(l level) string {
 		left = errStyle.Render("error: " + truncate(l.err, 60))
 	}
 
-	// Reserve the op-key hint line (inert in read-only mode).
-	ops := footerStyle.Render("[d]eploy [r]estart [L]ogs [s]hell  (soon)")
+	// Op-key hints: deploy is wired in a namespace/deployment view; r/L/s remain
+	// reserved (later steps).
+	ops := footerStyle.Render("[d]eploy [r]estart [L]ogs [s]hell")
+	if m.deployContextAvailable() {
+		ops = hintStyle.Render("[d]eploy") + footerStyle.Render(" [r]estart [L]ogs [s]hell")
+	}
 
 	return left + "    " + ops + "\n" + footerStyle.Render(hints)
 }

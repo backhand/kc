@@ -1,0 +1,243 @@
+package tui
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+
+	"github.com/thinkpilot/infrastructure/tools/kc/internal/deploy"
+	"github.com/thinkpilot/infrastructure/tools/kc/internal/github"
+)
+
+// Rendering for the deploy modal (SPEC "Deploy flow (v1)"). Plain, scannable
+// frames — checkboxes, an annotated version list, the from→to confirm summary,
+// and the per-deployment rollout view. Styling reuses view.go's palette.
+
+var (
+	chipStyle    = lipgloss.NewStyle().Foreground(accent)
+	chipOnStyle  = lipgloss.NewStyle().Foreground(good).Bold(true)
+	preStyle     = lipgloss.NewStyle().Foreground(warn) // pre-release flag
+	checkOnStyle = lipgloss.NewStyle().Foreground(good).Bold(true)
+)
+
+// renderDeployModal dispatches to the active phase's renderer.
+func (m Model) renderDeployModal() string {
+	ds := m.deployModal
+	var b strings.Builder
+	title := fmt.Sprintf("deploy — %s", ds.namespace)
+	if ds.repoOK {
+		title += headerStyle.Render(fmt.Sprintf("   (%s/%s)", ds.repo.Owner, ds.repo.Repo))
+	}
+	b.WriteString(titleStyle.Render("kc") + "  " + titleStyle.Render(title) + "\n\n")
+
+	switch ds.phase {
+	case phaseSelect:
+		b.WriteString(m.renderDeploySelect(ds))
+	case phaseVersions:
+		b.WriteString(m.renderDeployVersions(ds))
+	case phaseConfirm:
+		b.WriteString(m.renderDeployConfirm(ds))
+	case phaseRollout:
+		b.WriteString(m.renderDeployRollout(ds))
+	}
+	return b.String()
+}
+
+// renderDeploySelect renders the deployment checkboxes + preset chips.
+func (m Model) renderDeploySelect(ds *deployState) string {
+	var b strings.Builder
+	b.WriteString(headerStyle.Render("select deployments to deploy") + "\n\n")
+
+	for i, d := range ds.deployments {
+		box := "[ ]"
+		if ds.checked[d.Name] {
+			box = checkOnStyle.Render("[x]")
+		}
+		marker := "  "
+		name := d.Name
+		ver := d.Image.Tag
+		if ver == "" {
+			ver = "—"
+		}
+		line := fmt.Sprintf("%s %-22s %s", box, truncate(name, 22), headerStyle.Render(ver))
+		if i == ds.selCursor {
+			marker = "› "
+			line = selectedStyle.Render(fmt.Sprintf("%s %-22s ", box, truncate(name, 22))) + headerStyle.Render(ver)
+		}
+		b.WriteString(marker + line + "\n")
+	}
+
+	// Preset chips (one-key toggles for learned deployment-sets).
+	if len(ds.presets) > 0 {
+		b.WriteString("\n" + headerStyle.Render("presets:") + " ")
+		chips := make([]string, 0, len(ds.presets))
+		for i, p := range ds.presets {
+			label := fmt.Sprintf("%d:%s", i+1, strings.Join(p, "+"))
+			style := chipStyle
+			if presetFullyChecked(ds, p) {
+				style = chipOnStyle
+			}
+			chips = append(chips, style.Render(label))
+		}
+		b.WriteString(strings.Join(chips, "  ") + "\n")
+	}
+
+	if !ds.repoOK {
+		b.WriteString("\n" + errStyle.Render("no ghcr.io image on these deployments — cannot list releases") + "\n")
+	}
+
+	hint := "space toggle · 1-9 preset · enter versions › · esc cancel"
+	b.WriteString("\n" + footerStyle.Render(hint))
+	return b.String()
+}
+
+// renderDeployVersions renders the annotated release list.
+func (m Model) renderDeployVersions(ds *deployState) string {
+	var b strings.Builder
+	sel := strings.Join(checkedNames(ds.checked), ", ")
+	b.WriteString(headerStyle.Render("pick a version for: "+sel) + "\n\n")
+
+	if ds.releasesLoading && len(ds.releases) == 0 {
+		b.WriteString(hintStyle.Render("  loading releases…") + "\n")
+	} else if ds.releasesErr != "" {
+		b.WriteString(errStyle.Render("  error: "+truncate(ds.releasesErr, 70)) + "\n")
+	} else if len(ds.releases) == 0 {
+		b.WriteString(hintStyle.Render("  (no releases)") + "\n")
+	} else {
+		b.WriteString(colHeadStyle.Render(fmt.Sprintf("  %-16s %-10s %-10s %s", "VERSION", "BUILD", "IMAGE", "FLAGS")) + "\n")
+		for i, r := range ds.releases {
+			marker := "  "
+			line := releaseRow(r)
+			if i == ds.relCursor {
+				marker = "› "
+				line = selectedStyle.Render(line)
+			}
+			b.WriteString(marker + line + "\n")
+		}
+	}
+	if ds.relPage > 0 {
+		b.WriteString(hintStyle.Render(fmt.Sprintf("  …page %d (older)", ds.relPage+1)) + "\n")
+	}
+
+	hint := "↑/↓ move · enter confirm › · o …older · esc back"
+	b.WriteString("\n" + footerStyle.Render(hint))
+	return b.String()
+}
+
+// releaseRow renders one annotated release line: tag, build status, image
+// availability, and prerelease/latest flags.
+func releaseRow(r github.ReleaseAnnotation) string {
+	flags := []string{}
+	if r.Prerelease {
+		flags = append(flags, preStyle.Render("pre-release"))
+	}
+	if r.Latest {
+		flags = append(flags, chipStyle.Render("latest"))
+	}
+	return fmt.Sprintf("%-16s %-10s %-10s %s",
+		truncate(r.Tag, 16), buildLabel(r.Build), availLabel(r.ImageAvailable), strings.Join(flags, " "))
+}
+
+// buildLabel renders a colour-coded build status.
+func buildLabel(b github.BuildStatus) string {
+	switch b {
+	case github.BuildReady:
+		return lipgloss.NewStyle().Foreground(good).Render("ready")
+	case github.BuildBuilding:
+		return lipgloss.NewStyle().Foreground(warn).Render("building")
+	case github.BuildFailed:
+		return lipgloss.NewStyle().Foreground(bad).Render("failed")
+	default:
+		return hintStyle.Render("none")
+	}
+}
+
+// availLabel renders the tri-state image availability.
+func availLabel(a github.Availability) string {
+	switch a {
+	case github.AvailPresent:
+		return lipgloss.NewStyle().Foreground(good).Render("present")
+	case github.AvailAbsent:
+		return lipgloss.NewStyle().Foreground(bad).Render("absent")
+	default:
+		return hintStyle.Render("—")
+	}
+}
+
+// renderDeployConfirm renders the exactly-what-changes summary (from→to).
+func (m Model) renderDeployConfirm(ds *deployState) string {
+	var b strings.Builder
+	b.WriteString(headerStyle.Render("confirm — the following will change:") + "\n\n")
+	b.WriteString(colHeadStyle.Render(fmt.Sprintf("  %-22s %-14s %s", "DEPLOYMENT", "CONTAINER", "CHANGE")) + "\n")
+	for _, c := range ds.changes {
+		container := c.Container
+		if container == "" {
+			container = deploy.AllContainers // "*" — every container
+		}
+		from := c.FromTag
+		if from == "" {
+			from = "—"
+		}
+		change := fmt.Sprintf("%s → %s", from, lipgloss.NewStyle().Foreground(accent).Render(c.ToTag))
+		if c.NoOp() {
+			change += hintStyle.Render("  (no version change)")
+		}
+		b.WriteString(fmt.Sprintf("  %-22s %-14s %s\n", truncate(c.Deployment, 22), truncate(container, 14), change))
+	}
+	b.WriteString("\n" + headerStyle.Render(fmt.Sprintf("via: kubectl set image  (%d deployment(s))", len(ds.changes))) + "\n")
+
+	hint := lipgloss.NewStyle().Foreground(warn).Render("enter to APPLY") + footerStyle.Render(" · esc back")
+	b.WriteString("\n" + hint)
+	return b.String()
+}
+
+// renderDeployRollout renders per-deployment rollout status.
+func (m Model) renderDeployRollout(ds *deployState) string {
+	var b strings.Builder
+	b.WriteString(headerStyle.Render("rollout") + "\n\n")
+	for _, l := range ds.rollouts {
+		var status string
+		switch l.state {
+		case rolloutRunning, rolloutPending:
+			status = lipgloss.NewStyle().Foreground(warn).Render("↻ rolling out…")
+		case rolloutDone:
+			status = lipgloss.NewStyle().Foreground(good).Render("✓ done")
+		case rolloutFailed:
+			status = lipgloss.NewStyle().Foreground(bad).Render("✗ failed")
+		}
+		b.WriteString(fmt.Sprintf("  %-22s %s\n", truncate(l.deployment, 22), status))
+		if l.detail != "" {
+			b.WriteString(hintStyle.Render("      "+truncate(l.detail, 64)) + "\n")
+		}
+	}
+
+	var hint string
+	if rolloutSettled(ds.rollouts) {
+		hint = footerStyle.Render("enter/esc to close")
+	} else {
+		hint = footerStyle.Render("esc to close (rollout continues)")
+	}
+	b.WriteString("\n" + hint)
+	return b.String()
+}
+
+// presetFullyChecked reports whether every (existing) name in a preset is
+// currently checked — so a chip can render "active".
+func presetFullyChecked(ds *deployState, preset []string) bool {
+	existing := map[string]bool{}
+	for _, d := range ds.deployments {
+		existing[d.Name] = true
+	}
+	any := false
+	for _, name := range preset {
+		if !existing[name] {
+			continue
+		}
+		any = true
+		if !ds.checked[name] {
+			return false
+		}
+	}
+	return any
+}

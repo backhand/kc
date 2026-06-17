@@ -475,7 +475,9 @@ func parseDeployments(deployments []rawDeployment, pods []rawPod, replicaSets []
 		}
 		images := make([]ImageRef, 0, len(containers))
 		for _, c := range containers {
-			images = append(images, ParseImage(c.Image))
+			ref := ParseImage(c.Image)
+			ref.Name = c.Name // owning container name (for `set image <name>=…`)
+			images = append(images, ref)
 		}
 		primary := ImageRef{}
 		if len(images) > 0 {

@@ -25,6 +25,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/thinkpilot/infrastructure/tools/kc/internal/cache"
+	"github.com/thinkpilot/infrastructure/tools/kc/internal/deploy"
 	"github.com/thinkpilot/infrastructure/tools/kc/internal/k8s"
 	"github.com/thinkpilot/infrastructure/tools/kc/internal/resolve"
 	"github.com/thinkpilot/infrastructure/tools/kc/internal/store"
@@ -98,6 +99,11 @@ type Model struct {
 	help     help.Model
 	showHelp bool
 
+	// deployModal is the active deploy flow (SPEC "Deploy flow (v1)"), or nil
+	// when the normal zoom views are showing. When set, it owns key handling and
+	// rendering until dismissed.
+	deployModal *deployState
+
 	quitting bool
 }
 
@@ -118,12 +124,19 @@ type Deps struct {
 	AllDeployCache  *cache.Cache[[]k8s.Deployment]
 	VersionHintFunc func([]k8s.Deployment) map[string]string
 
-	// History is the generic learning store (used here only to remember the
-	// last-viewed namespace per app on entry). Nil disables recording.
+	// History is the generic learning store: remembers the last-viewed namespace
+	// per app on entry AND the deploy presets (RecordDeploy / DeployPresets) the
+	// deploy modal pre-checks. Nil disables recording.
 	History *store.ActionHistory
 	// App is the repo/app name the learning records are scoped under (empty when
 	// not launched in a repo — recording is then skipped).
 	App string
+
+	// Runner executes the deploy mutation (`kubectl set image` / `rollout
+	// status`). Nil = the real exec.Run shell-out (deploy.SetImage's default);
+	// tests inject a capture func to assert the constructed kubectl argv WITHOUT
+	// touching a cluster.
+	Runner deploy.Runner
 
 	// Fetchers are the data-layer calls, injectable for tests. When nil, New
 	// falls back to the real internal/k8s + internal/resolve functions bound to
@@ -150,6 +163,11 @@ type Entry struct {
 func New(deps Deps) Model {
 	if deps.Fetch.Overview == nil {
 		deps.Fetch = realFetchers(deps.KubeOpts)
+	}
+	if deps.Fetch.Releases == nil {
+		// Fall back to the real release fetcher if the caller supplied other
+		// fetchers but not Releases (so a partial Fetchers still deploys).
+		deps.Fetch.Releases = realFetchers(deps.KubeOpts).Releases
 	}
 	if deps.VersionHintFunc == nil {
 		deps.VersionHintFunc = versionHintsFromDeployments
