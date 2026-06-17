@@ -68,9 +68,9 @@ func formatAge(d time.Duration) string {
 	}
 }
 
-// bar renders a fixed-width fill gauge for a fraction in [0,1] using block
+// barGlyphs renders a fixed-width fill gauge for a fraction in [0,1] using block
 // glyphs, e.g. used/capacity. width is the inner cell count.
-func bar(frac float64, width int) string {
+func barGlyphs(frac float64, width int) string {
 	if width <= 0 {
 		return ""
 	}
@@ -111,4 +111,15 @@ func pad(s string, width int) string {
 		return s
 	}
 	return s + strings.Repeat(" ", width-n)
+}
+
+// leftPad left-pads s with spaces to width runes (no truncation). Used to align
+// the right edge of the gauge value text so the bars that follow start at a
+// fixed column across rows.
+func leftPad(s string, width int) string {
+	n := len([]rune(s))
+	if n >= width {
+		return s
+	}
+	return strings.Repeat(" ", width-n) + s
 }

@@ -80,6 +80,42 @@ func staleOverview() k8s.ClusterOverview {
 	}
 }
 
+// gaugeOverview is the alignment fixture: caps chosen so the cpu AND mem
+// "used/cap" value texts differ in display width across the cluster row and the
+// two node rows — so the gauge bars would land at different columns without the
+// per-column left-padding in renderNodeHeader. With the fixture's formatting:
+//
+//	          cpu value     (w)   mem value         (w)
+//	cluster   10.00/16.00   (11)  14.0Gi/18.9Gi     (13)
+//	cp-0      800m/4.00      (9)  5.0Gi/11.3Gi      (12)
+//	agent-0   1.20/8.00      (9)  2.8Gi/7.6Gi       (11)
+//
+// Three distinct mem widths and two distinct cpu widths: the bar-start columns
+// only line up if the value text is padded to the column max, so this fixture
+// makes TestOverviewFrameLayout fail if the padding regresses.
+func gaugeOverview() k8s.ClusterOverview {
+	var gi int64 = 1 << 30 // runtime (not const) so the float→int64 casts below compile
+	return k8s.ClusterOverview{
+		Nodes: []k8s.Node{
+			{Name: "cp-0", ControlPlane: true, Ready: true, KubeletVersion: "v1.30.0",
+				Capacity: k8s.Usage{CPUMillicores: 4000, MemoryBytes: int64(11.3 * float64(gi))},
+				Usage:    &k8s.Usage{CPUMillicores: 800, MemoryBytes: 5 * gi}},
+			{Name: "agent-0", Ready: true, KubeletVersion: "v1.30.0",
+				Capacity: k8s.Usage{CPUMillicores: 8000, MemoryBytes: int64(7.6 * float64(gi))},
+				Usage:    &k8s.Usage{CPUMillicores: 1200, MemoryBytes: int64(2.8 * float64(gi))}},
+		},
+		Namespaces: []k8s.Namespace{
+			{Name: "mailon", Kind: k8s.KindUser, Phase: "Active"},
+			{Name: "mailon-staging", Kind: k8s.KindUser, Phase: "Active"},
+			{Name: "kube-system", Kind: k8s.KindSystem, Phase: "Active"},
+		},
+		Totals: k8s.Totals{
+			Usage:    &k8s.Usage{CPUMillicores: 10000, MemoryBytes: 14 * gi},
+			Capacity: k8s.Usage{CPUMillicores: 16000, MemoryBytes: int64(18.9 * float64(gi))},
+		},
+	}
+}
+
 func mailonNamespaceView() k8s.NamespaceView {
 	return k8s.NamespaceView{
 		Namespace: "mailon",
@@ -329,13 +365,18 @@ func TestFetchErrorKeepsStaleData(t *testing.T) {
 }
 
 // TestOverviewFrameLayout captures the rendered overview frame and asserts the
-// header layout: the cluster-total row comes first, the per-node rows underneath
-// share the cluster row's column starts (the "cpu" gauge token at an identical
-// offset on every resource row), a blank line separates the node block from the
-// NAMESPACE list, and the freshness indicator lives in the top bar (line 1,
-// after the "kc · …" breadcrumb) rather than in the footer.
+// header layout: the cluster-total row comes first; the per-node rows underneath
+// share the cluster row's column starts — the "cpu"/"mem" LABELS and, crucially,
+// the gauge BARS line up across the cluster row and every node row even when the
+// "used/cap" value texts differ in display width (the gaugeOverview fixture is
+// built so they do, on both columns). A blank line separates the node block from
+// the NAMESPACE list; a blank line separates the list from the footer action
+// keys; and the freshness indicator lives in the top bar (line 0), not the
+// footer.
 func TestOverviewFrameLayout(t *testing.T) {
-	h := newHarness(t, defaultFetchers())
+	fetch := defaultFetchers()
+	fetch.Overview = func(context.Context) (k8s.ClusterOverview, error) { return gaugeOverview(), nil }
+	h := newHarness(t, fetch)
 	tm := teatest.NewTestModel(t, New(h.deps), teatest.WithInitialTermSize(120, 30))
 	// Wait for the fresh overview (mailon + the node rows + a freshness stamp).
 	waitFor(t, tm, "mailon", "kube-system", "updated")
@@ -347,6 +388,9 @@ func TestOverviewFrameLayout(t *testing.T) {
 	}
 	m.quitting = false // View() blanks while quitting; render the last real frame
 	frame := stripANSI(m.View())
+	// Surface the rendered frame on failure (and via -v) so the alignment is
+	// inspectable by eye, not just asserted.
+	t.Logf("rendered overview frame:\n%s", frame)
 	lines := strings.Split(frame, "\n")
 
 	// 1) Freshness in the TOP BAR: line 0 carries "kc · all-namespaces" AND the
@@ -382,26 +426,98 @@ func TestOverviewFrameLayout(t *testing.T) {
 		t.Fatalf("cluster row (%d) must precede the node rows (%d)", idxCluster, idxFirstNode)
 	}
 
-	// 1) Columns aligned: the "cpu " token starts at the same offset on the
-	//    cluster row and every node row (cp-0, agent-0).
-	clusterCPU := strings.Index(lines[idxCluster], "cpu ")
-	if clusterCPU < 0 {
-		t.Fatalf("no cpu gauge on the cluster row: %q", lines[idxCluster])
-	}
+	// resourceRows is the cluster row plus every (non-blank) node row, in order.
+	var resourceRows []int
+	resourceRows = append(resourceRows, idxCluster)
 	for i := idxFirstNode; i < idxNamespace; i++ {
-		if strings.TrimSpace(lines[i]) == "" {
-			continue
+		if strings.TrimSpace(lines[i]) != "" {
+			resourceRows = append(resourceRows, i)
 		}
-		if got := strings.Index(lines[i], "cpu "); got != clusterCPU {
-			t.Fatalf("cpu column misaligned: cluster@%d vs node row %q cpu@%d",
-				clusterCPU, lines[i], got)
-		}
+	}
+	if len(resourceRows) < 3 {
+		t.Fatalf("expected the cluster row + 2 node rows, found %d resource rows", len(resourceRows))
 	}
 
-	// 3) Blank line between the node block and the NAMESPACE list. The line
+	// 3) Column alignment: the "cpu " and "mem " LABEL tokens start at the same
+	//    offset on every resource row.
+	wantLabelCol := func(token string) int {
+		base := strings.Index(lines[idxCluster], token)
+		if base < 0 {
+			t.Fatalf("no %q gauge on the cluster row: %q", token, lines[idxCluster])
+		}
+		for _, i := range resourceRows {
+			if got := strings.Index(lines[i], token); got != base {
+				t.Fatalf("%q label misaligned: cluster@%d vs row %q @%d", token, base, lines[i], got)
+			}
+		}
+		return base
+	}
+	wantLabelCol("cpu ")
+	wantLabelCol("mem ")
+
+	// 4) Bar alignment (the bug under test): the gauge BAR must start at the same
+	//    column on every resource row — for BOTH cpu and mem — despite the value
+	//    texts differing in width (gaugeOverview guarantees they differ). Without
+	//    the per-column value left-padding this fails: the wider cluster value
+	//    pushes its bar right of the narrower node bars.
+	//
+	// We locate each column's bar by scanning from just after the column label to
+	// the first bar glyph (█ filled or ░ empty); a "—" value (no metrics) has no
+	// bar, but every gaugeOverview cell has usage so all rows carry a bar.
+	barStart := func(line string, from int) int {
+		runes := []rune(line)
+		for i := from; i < len(runes); i++ {
+			if runes[i] == '█' || runes[i] == '░' {
+				// rune index → the visible column is the rune offset (frame is
+				// ANSI-stripped, and every glyph up to here is a single column).
+				return i
+			}
+		}
+		return -1
+	}
+	assertBarsAligned := func(colName string, labelCol int) {
+		var want int
+		for n, i := range resourceRows {
+			runeStart := len([]rune(lines[i][:labelCol])) // byte→rune offset of the label
+			got := barStart(lines[i], runeStart)
+			if got < 0 {
+				t.Fatalf("%s bar missing on row %q", colName, lines[i])
+			}
+			if n == 0 {
+				want = got
+				continue
+			}
+			if got != want {
+				t.Fatalf("%s bar misaligned: cluster bar@%d vs row %q bar@%d (value-text padding regressed)",
+					colName, want, lines[i], got)
+			}
+		}
+	}
+	cpuLabel := strings.Index(lines[idxCluster], "cpu ")
+	memLabel := strings.Index(lines[idxCluster], "mem ")
+	assertBarsAligned("cpu", cpuLabel)
+	assertBarsAligned("mem", memLabel)
+
+	// 5) Blank line between the node block and the NAMESPACE list. The line
 	//    directly above the NAMESPACE header must be empty.
 	if got := strings.TrimSpace(lines[idxNamespace-1]); got != "" {
 		t.Fatalf("expected a blank line before the NAMESPACE list, got %q", lines[idxNamespace-1])
+	}
+
+	// 6) Blank line between the data list and the footer action keys: the line
+	//    directly above the "[d]eploy …" op line must be empty.
+	idxOps := -1
+	for i, ln := range lines {
+		if strings.Contains(ln, "[d]eploy") {
+			idxOps = i
+			break
+		}
+	}
+	if idxOps <= 0 {
+		t.Fatalf("could not locate the [d]eploy op line in frame:\n%s", frame)
+	}
+	if got := strings.TrimSpace(lines[idxOps-1]); got != "" {
+		t.Fatalf("expected a blank line above the [d]eploy op line, got %q", lines[idxOps-1])
 	}
 }
 
