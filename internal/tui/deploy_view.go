@@ -201,25 +201,38 @@ func (m Model) renderDeployConfirm(ds *deployState) string {
 	return b.String()
 }
 
-// renderDeployRollout renders per-deployment rollout status.
-func (m Model) renderDeployRollout(ds *deployState) string {
+// renderRolloutLines renders ONE line per deployment — name, status, and (once
+// settled) the status message inline after it. Keeping each deployment to a
+// single line means the list never grows or shifts as rollouts finish: the
+// detail used to wrap onto an indented line below, which pushed everything down.
+// running is the in-progress label, which differs per op ("↻ rolling out…" /
+// "↻ restarting…" / "↻ scaling…"). Shared by the deploy / restart / scale views.
+func renderRolloutLines(rollouts []rolloutLine, running string) string {
 	var b strings.Builder
-	b.WriteString(headerStyle.Render("rollout") + "\n\n")
-	for _, l := range ds.rollouts {
+	for _, l := range rollouts {
 		var status string
 		switch l.state {
-		case rolloutRunning, rolloutPending:
-			status = lipgloss.NewStyle().Foreground(warn).Render("↻ rolling out…")
 		case rolloutDone:
 			status = lipgloss.NewStyle().Foreground(good).Render("✓ done")
 		case rolloutFailed:
 			status = lipgloss.NewStyle().Foreground(bad).Render("✗ failed")
+		default: // running / pending
+			status = lipgloss.NewStyle().Foreground(warn).Render(running)
 		}
-		b.WriteString(fmt.Sprintf("  %-22s %s\n", truncate(l.deployment, 22), status))
+		line := fmt.Sprintf("  %-22s %s", truncate(l.deployment, 22), status)
 		if l.detail != "" {
-			b.WriteString(hintStyle.Render("      "+truncate(l.detail, 64)) + "\n")
+			line += "  " + hintStyle.Render(truncate(l.detail, 50))
 		}
+		b.WriteString(line + "\n")
 	}
+	return b.String()
+}
+
+// renderDeployRollout renders per-deployment rollout status.
+func (m Model) renderDeployRollout(ds *deployState) string {
+	var b strings.Builder
+	b.WriteString(headerStyle.Render("rollout") + "\n\n")
+	b.WriteString(renderRolloutLines(ds.rollouts, "↻ rolling out…"))
 
 	var hint string
 	if rolloutSettled(ds.rollouts) {

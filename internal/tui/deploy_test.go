@@ -615,3 +615,28 @@ func TestDeploy_AbortsWhenBuildFails(t *testing.T) {
 		}
 	}
 }
+
+// TestRenderRolloutLines_OneLinePerDeployment guards the rollout layout: each
+// deployment is exactly one line with its status message inline — a settled
+// deployment must NOT push a second (indented) detail line below it, which made
+// the list grow/shift as rollouts completed.
+func TestRenderRolloutLines_OneLinePerDeployment(t *testing.T) {
+	lines := []rolloutLine{
+		{deployment: "ingester", state: rolloutDone, detail: `deployment "ingester" successfully rolled out`},
+		{deployment: "sender", state: rolloutRunning},
+	}
+	out := renderRolloutLines(lines, "↻ rolling out…")
+	rows := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if len(rows) != 2 {
+		t.Fatalf("got %d rows, want one per deployment (no detail line); out=%q", len(rows), out)
+	}
+	// The settled deployment carries its status AND detail inline (same row).
+	if !strings.Contains(rows[0], "ingester") || !strings.Contains(rows[0], "done") ||
+		!strings.Contains(rows[0], "rolled out") {
+		t.Errorf("done row missing inline status/detail: %q", rows[0])
+	}
+	// The in-progress deployment is a single line with no detail.
+	if !strings.Contains(rows[1], "sender") || strings.Contains(rows[1], "rolled out") {
+		t.Errorf("running row = %q, want just sender + status", rows[1])
+	}
+}

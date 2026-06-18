@@ -79,21 +79,7 @@ func (m Model) renderScaleReplicas(ss *scaleState) string {
 func (m Model) renderScaleRollout(ss *scaleState) string {
 	var b strings.Builder
 	b.WriteString(headerStyle.Render("rollout") + "\n\n")
-	for _, l := range ss.rollouts {
-		var status string
-		switch l.state {
-		case rolloutRunning, rolloutPending:
-			status = lipgloss.NewStyle().Foreground(warn).Render("↻ scaling…")
-		case rolloutDone:
-			status = lipgloss.NewStyle().Foreground(good).Render("✓ done")
-		case rolloutFailed:
-			status = lipgloss.NewStyle().Foreground(bad).Render("✗ failed")
-		}
-		b.WriteString(fmt.Sprintf("  %-22s %s\n", truncate(l.deployment, 22), status))
-		if l.detail != "" {
-			b.WriteString(hintStyle.Render("      "+truncate(l.detail, 64)) + "\n")
-		}
-	}
+	b.WriteString(renderRolloutLines(ss.rollouts, "↻ scaling…"))
 
 	var hint string
 	if rolloutSettled(ss.rollouts) {
