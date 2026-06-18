@@ -498,16 +498,39 @@ func TestScale_RecordsSetIntoLearningStore(t *testing.T) {
 	tm.Send(runeMsg('q'))
 	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 
-	// The scale action recorded the set under the "scale" key ({deployments:[...]}),
-	// in the same shape deploy/restart use — so a scale history accrues (SPEC).
+	// Scale feeds the SHARED preset pool (DeployPresets) — the same one deploy and
+	// restart read — so the scaled set resurfaces as a preset the next time ANY
+	// set-based op opens (previously scale wrote to an unread "scale" bucket, so a
+	// scaled set never became a chip).
 	scope := store.Scope{Cluster: testCluster, App: "mailon"}
-	ranked := hist.Ranked("scale", scope)
-	if len(ranked) == 0 {
-		t.Fatalf("expected the scaled set to be recorded under the scale action; got none")
+	presets := hist.DeployPresets(scope)
+	if len(presets) != 1 || !reflect.DeepEqual(presets[0], []string{"responder"}) {
+		t.Errorf("DeployPresets after scale = %v, want [[responder]]", presets)
 	}
-	raw, ok := ranked[0]["deployments"].([]any)
-	if !ok || len(raw) != 1 || raw[0] != "responder" {
-		t.Errorf("recorded scale set = %v, want [responder]", ranked[0]["deployments"])
+}
+
+// TestRestart_RecordsSetIntoLearningStore asserts a restart feeds the same shared
+// preset pool (DeployPresets) as deploy/scale, so a restarted set resurfaces as a
+// preset next time. Mirrors the scale case — the fix is shared (recordSet).
+func TestRestart_RecordsSetIntoLearningStore(t *testing.T) {
+	deps, _, _, hist := opsHarness(t)
+	tm := onMailonNamespace(t, deps)
+
+	tm.Send(runeMsg('r')) // open restart SELECT (responder preselected)
+	waitFor(t, tm, "select deployments to restart")
+	tm.Send(enterMsg()) // → confirm
+	waitFor(t, tm, "confirm", "deployment/responder")
+	tm.Send(enterMsg()) // RESTART → records the set
+	waitFor(t, tm, "rollout", "done")
+
+	tm.Send(escMsg())
+	tm.Send(runeMsg('q'))
+	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+
+	scope := store.Scope{Cluster: testCluster, App: "mailon"}
+	presets := hist.DeployPresets(scope)
+	if len(presets) != 1 || !reflect.DeepEqual(presets[0], []string{"responder"}) {
+		t.Errorf("DeployPresets after restart = %v, want [[responder]]", presets)
 	}
 }
 

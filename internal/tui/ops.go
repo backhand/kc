@@ -10,7 +10,6 @@ import (
 
 	"github.com/backhand/kc/internal/deploy"
 	"github.com/backhand/kc/internal/k8s"
-	"github.com/backhand/kc/internal/store"
 )
 
 // The contextual operations on the selected workload (SPEC "Operations"):
@@ -158,12 +157,10 @@ func (m Model) openRestart() (tea.Model, tea.Cmd) {
 }
 
 // opPresets are the learned deployment-sets a set-based op (restart / scale)
-// preselects from. We reuse DEPLOY's presets (DeployPresets): they represent
-// "sets deployed together", which is exactly the set a user typically wants to
-// restart or scale together — and on a fresh install neither restart nor scale
-// has a history of its own yet. Each op STILL records its own sets (recordRestart
-// / recordScale), so a per-action history accrues for future use; we just don't
-// read those back yet, to avoid a cold-start with no chips.
+// preselects from — the shared pool that deploy, restart, and scale all read AND
+// write (DeployPresets / recordSet). A set you operate on together with one op is
+// exactly the set you'll want preselected by the others, so every set-based op
+// feeds the same pool. Empty store / not-in-a-repo → no chips.
 func (m Model) opPresets(ns string) [][]string {
 	if m.deps.History == nil {
 		return nil
@@ -222,7 +219,7 @@ func (m Model) restartConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Confirm-gated APPLY: record the restarted SET (learning) + fire one
 		// restart+watch per selected deployment.
 		names := rs.sel.checkedNames()
-		m.recordRestart(rs, names)
+		m.recordSet(rs.namespace, names)
 		rs.phase = restartRollout
 		rs.rollouts = make([]rolloutLine, len(names))
 		for i, name := range names {
@@ -272,19 +269,16 @@ func (m Model) onRestartStep(msg restartStepMsg) Model {
 	return m
 }
 
-// recordRestart records the restarted SET into the learning store under the same
-// shape deploy uses ({deployments: [...]}), so a "restart" history builds its own
-// presets over time (SPEC). Best-effort; nil store / not-in-a-repo simply skips.
-// Scoped cluster × app exactly like deploy.
-func (m Model) recordRestart(rs *restartState, names []string) {
-	if m.deps.History == nil {
+// recordSet records a deployment-set the user acted on (deploy / restart / scale)
+// into the shared learning store, so the set surfaces as a preset the next time
+// ANY set-based op opens its selection — they all read DeployPresets. Best-effort;
+// a nil store, not-in-a-repo scope, or empty set simply skips. Scoped cluster ×
+// app, exactly like deploy.
+func (m Model) recordSet(ns string, names []string) {
+	if m.deps.History == nil || len(names) == 0 {
 		return
 	}
-	arr := make([]any, len(names))
-	for i, s := range names {
-		arr[i] = s
-	}
-	_ = m.deps.History.Record("restart", m.deployScope(rs.namespace), store.Params{"deployments": arr})
+	_ = m.deps.History.RecordDeploy(m.deployScope(ns), names)
 }
 
 // ── Logs / shell (interactive, via tea.ExecProcess) ───────────────────────────

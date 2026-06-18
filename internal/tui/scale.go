@@ -9,7 +9,6 @@ import (
 
 	"github.com/backhand/kc/internal/deploy"
 	"github.com/backhand/kc/internal/k8s"
-	"github.com/backhand/kc/internal/store"
 )
 
 // The scale modal (the `s` op — SPEC "Operations"): scale a SET of deployments
@@ -194,7 +193,7 @@ func (m Model) scaleApply() (tea.Model, tea.Cmd) {
 		return m, nil // belt-and-suspenders: never apply an empty set
 	}
 	ss.applied = true
-	m.recordScale(ss, names)
+	m.recordSet(ss.namespace, names)
 	ss.phase = scaleRollout
 	ss.rollouts = make([]rolloutLine, len(names))
 	for i, name := range names {
@@ -240,21 +239,6 @@ func (m Model) onScaleStep(msg scaleStepMsg) Model {
 		}
 	}
 	return m
-}
-
-// recordScale records the scaled SET into the learning store under the same shape
-// deploy/restart use ({deployments: [...]}), so a "scale" history builds its own
-// presets over time (SPEC). Best-effort; nil store / not-in-a-repo simply skips.
-// Scoped cluster × app exactly like deploy/restart.
-func (m Model) recordScale(ss *scaleState, names []string) {
-	if m.deps.History == nil {
-		return
-	}
-	arr := make([]any, len(names))
-	for i, s := range names {
-		arr[i] = s
-	}
-	_ = m.deps.History.Record("scale", m.deployScope(ss.namespace), store.Params{"deployments": arr})
 }
 
 // parseReplicas parses the replica input to a non-negative int. ok is false for

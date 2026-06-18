@@ -309,18 +309,15 @@ func (m Model) deployRolloutKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// recordDeploy records the deployed deployment-set into the learning store so
-// the next deploy pre-checks it (SPEC: store.RecordDeploy). Best-effort; a
-// nil store / write failure is ignored.
+// recordDeploy records the deployed deployment-set into the shared preset pool
+// (recordSet) so the next deploy/restart/scale pre-checks it. Best-effort; a nil
+// store / write failure is ignored.
 func (m Model) recordDeploy(ds *deployState) {
-	if m.deps.History == nil {
-		return
-	}
 	names := make([]string, 0, len(ds.changes))
 	for _, c := range ds.changes {
 		names = append(names, c.Deployment)
 	}
-	_ = m.deps.History.RecordDeploy(m.deployScope(ds.namespace), names)
+	m.recordSet(ds.namespace, names)
 }
 
 // ── Loaded-message folding ───────────────────────────────────────────────────
