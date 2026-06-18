@@ -140,16 +140,42 @@ func AnnotateBuild(tag string, runs []RawRun) (BuildStatus, int64) {
 	if match == nil {
 		return BuildNone, 0
 	}
-	id := match.DatabaseID
-	if match.Status != "completed" {
-		// queued / in_progress / waiting / requested / pending → still building.
-		return BuildBuilding, id
+	return reduceRun(match.Status, match.Conclusion), match.DatabaseID
+}
+
+// reduceRun maps a run's (status, conclusion) to a BuildStatus:
+//
+//	status != completed            → building (queued / in_progress / waiting / …)
+//	completed + success            → ready
+//	completed + anything else      → failed (failure / cancelled / timed_out / …)
+func reduceRun(status, conclusion string) BuildStatus {
+	if status != "completed" {
+		return BuildBuilding
 	}
-	if match.Conclusion == "success" {
-		return BuildReady, id
+	if conclusion == "success" {
+		return BuildReady
 	}
-	// failure | cancelled | timed_out | action_required | startup_failure | ""
-	return BuildFailed, id
+	return BuildFailed
+}
+
+// RunStatus polls a single Actions run by id and reduces it to a BuildStatus.
+// Used by the deploy flow's "wait for the build" step, which watches the run
+// behind the selected version until it goes ready (deploy) or failed (abort).
+//
+// On any `gh` error it returns BuildBuilding + the error so the caller can keep
+// polling through a transient hiccup (the caller bounds total attempts). timeout
+// zero → exec.DefaultTimeout.
+func RunStatus(ctx context.Context, repo git.RepoRef, runID int64, timeout time.Duration) (BuildStatus, error) {
+	var run RawRun
+	err := ghJSON(ctx, []string{
+		"run", "view", strconv.FormatInt(runID, 10),
+		"--repo", repoSlug(repo),
+		"--json", "status,conclusion",
+	}, timeout, &run)
+	if err != nil {
+		return BuildBuilding, err
+	}
+	return reduceRun(run.Status, run.Conclusion), nil
 }
 
 // AnnotateReleases combines releases + runs into annotations (pure). Image

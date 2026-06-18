@@ -41,9 +41,39 @@ func (m Model) renderDeployModal() string {
 		b.WriteString(m.renderDeployVersions(ds))
 	case phaseConfirm:
 		b.WriteString(m.renderDeployConfirm(ds))
+	case phaseAwaitBuild:
+		b.WriteString(m.renderDeployAwait(ds))
 	case phaseRollout:
 		b.WriteString(m.renderDeployRollout(ds))
 	}
+	return b.String()
+}
+
+// renderDeployAwait renders the watch-the-build phase: kc is polling the selected
+// version's Actions run and deploys automatically when it goes green. A
+// failed/timed-out build aborts here — nothing was deployed.
+func (m Model) renderDeployAwait(ds *deployState) string {
+	var b strings.Builder
+	tag := truncate(ds.selected.Tag, 40)
+	run := hintStyle.Render(fmt.Sprintf("run #%d", ds.buildRunID))
+
+	if ds.buildStatus == github.BuildFailed {
+		b.WriteString(lipgloss.NewStyle().Foreground(bad).Bold(true).Render("✗ build did not succeed") + "\n\n")
+		b.WriteString(fmt.Sprintf("  %s   %s\n", tag, run))
+		if ds.buildErr != "" {
+			b.WriteString("  " + errStyle.Render(truncate(ds.buildErr, 70)) + "\n")
+		}
+		b.WriteString("\n" + footerStyle.Render("enter/esc to close"))
+		return b.String()
+	}
+
+	b.WriteString(lipgloss.NewStyle().Foreground(warn).Render("⏳ waiting for the build…") + "\n\n")
+	b.WriteString(fmt.Sprintf("  %s   %s\n", tag, run))
+	b.WriteString(hintStyle.Render("  watching the Actions run — kc deploys automatically when it goes green") + "\n")
+	if ds.buildErr != "" { // a transient gh hiccup mid-poll
+		b.WriteString(hintStyle.Render("  (retrying: "+truncate(ds.buildErr, 56)+")") + "\n")
+	}
+	b.WriteString("\n" + footerStyle.Render("esc to cancel"))
 	return b.String()
 }
 
@@ -158,7 +188,15 @@ func (m Model) renderDeployConfirm(ds *deployState) string {
 	}
 	b.WriteString("\n" + headerStyle.Render(fmt.Sprintf("via: kubectl set image  (%d deployment(s))", len(ds.changes))) + "\n")
 
-	hint := lipgloss.NewStyle().Foreground(warn).Render("enter to APPLY") + footerStyle.Render(" · esc back")
+	// A still-building version is deployed via the watch-then-deploy flow.
+	apply := "enter to APPLY"
+	if ds.selected.Build == github.BuildBuilding {
+		b.WriteString("\n" + lipgloss.NewStyle().Foreground(warn).Render(
+			"⏳ "+ds.selected.Tag+" is still building — kc will watch its run and deploy when it goes green.") + "\n")
+		apply = "enter to watch the build, then deploy"
+	}
+
+	hint := lipgloss.NewStyle().Foreground(warn).Render(apply) + footerStyle.Render(" · esc back")
 	b.WriteString("\n" + hint)
 	return b.String()
 }

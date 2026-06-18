@@ -48,6 +48,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case releasesLoadedMsg:
 		return m.onReleasesLoaded(msg), nil
 
+	case buildPolledMsg:
+		return m.onBuildPolled(msg)
+
 	case deployStepMsg:
 		return m.onDeployStep(msg), nil
 

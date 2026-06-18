@@ -144,3 +144,26 @@ func TestAnnotateReleases_LiveMailonFixtures(t *testing.T) {
 		}
 	}
 }
+
+// TestReduceRun covers the (status, conclusion) → BuildStatus reduction shared by
+// AnnotateBuild and the single-run RunStatus poll (the deploy "wait for build").
+func TestReduceRun(t *testing.T) {
+	cases := []struct {
+		status, conclusion string
+		want               BuildStatus
+	}{
+		{"queued", "", BuildBuilding},
+		{"in_progress", "", BuildBuilding},
+		{"waiting", "", BuildBuilding},
+		{"completed", "success", BuildReady},
+		{"completed", "failure", BuildFailed},
+		{"completed", "cancelled", BuildFailed},
+		{"completed", "timed_out", BuildFailed},
+		{"completed", "", BuildFailed},
+	}
+	for _, c := range cases {
+		if got := reduceRun(c.status, c.conclusion); got != c.want {
+			t.Errorf("reduceRun(%q,%q) = %v, want %v", c.status, c.conclusion, got, c.want)
+		}
+	}
+}

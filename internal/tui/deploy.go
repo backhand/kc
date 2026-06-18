@@ -27,10 +27,11 @@ import (
 type deployPhase int
 
 const (
-	phaseSelect   deployPhase = iota // deployment checkboxes + preset chips
-	phaseVersions                    // annotated release list
-	phaseConfirm                     // change summary, confirm-gated
-	phaseRollout                     // per-deployment rollout status
+	phaseSelect     deployPhase = iota // deployment checkboxes + preset chips
+	phaseVersions                      // annotated release list
+	phaseConfirm                       // change summary, confirm-gated
+	phaseAwaitBuild                    // watch a still-building image's CI run, then deploy
+	phaseRollout                       // per-deployment rollout status
 )
 
 // rolloutLine tracks one deployment's rollout state in the final phase.
@@ -73,9 +74,20 @@ type deployState struct {
 	releasesLoading bool
 	releasesErr     string
 
+	// selected is the release chosen in the version phase, captured so confirm /
+	// await-build can read its build status + run id even as the list refreshes.
+	selected github.ReleaseAnnotation
+
 	// changes is the planned per-deployment image change, computed entering
 	// confirm and applied (confirm-gated) leaving it.
 	changes []deploy.Change
+
+	// Await-build state (phaseAwaitBuild): when the selected version's image is
+	// still building, kc watches its Actions run and deploys when it goes green.
+	buildRunID  int64              // the run being polled (0 = not waiting)
+	buildStatus github.BuildStatus // last polled status (building → ready/failed)
+	buildPolls  int                // poll attempts so far (bounds the total wait)
+	buildErr    string             // failure / timeout reason (or a transient hiccup)
 
 	// rollouts tracks per-deployment rollout state in the final phase.
 	rollouts []rolloutLine
@@ -201,6 +213,8 @@ func (m Model) handleDeployKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.deployVersionsKey(msg)
 	case phaseConfirm:
 		return m.deployConfirmKey(msg)
+	case phaseAwaitBuild:
+		return m.deployAwaitKey(msg)
 	case phaseRollout:
 		return m.deployRolloutKey(msg)
 	}
@@ -255,8 +269,8 @@ func (m Model) deployVersionsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if ds.relCursor < 0 || ds.relCursor >= len(ds.releases) {
 			return m, nil
 		}
-		tag := ds.releases[ds.relCursor].Tag
-		ds.changes = deploy.PlanChanges(ds.sel.deployments, ds.sel.checkedNames(), ds.repoImage, tag)
+		ds.selected = ds.releases[ds.relCursor]
+		ds.changes = deploy.PlanChanges(ds.sel.deployments, ds.sel.checkedNames(), ds.repoImage, ds.selected.Tag)
 		if len(ds.changes) == 0 {
 			return m, nil
 		}
@@ -277,21 +291,88 @@ func (m Model) deployConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil // guard double-confirm
 		}
 		ds.applied = true
-		// Record the deploy preset (learning) and start the rollout.
-		m.recordDeploy(ds)
-		ds.phase = phaseRollout
-		ds.rollouts = make([]rolloutLine, len(ds.changes))
-		for i, c := range ds.changes {
-			ds.rollouts[i] = rolloutLine{deployment: c.Deployment, state: rolloutRunning}
+		// If the selected version's image is still being built, watch its Actions
+		// run and deploy when it goes green (abort if it fails); otherwise deploy
+		// now. We need a run id to watch — a building release with none falls
+		// through to the immediate path.
+		if ds.selected.Build == github.BuildBuilding && ds.selected.BuildRunID != 0 {
+			ds.phase = phaseAwaitBuild
+			ds.buildRunID = ds.selected.BuildRunID
+			ds.buildStatus = github.BuildBuilding
+			ds.buildPolls = 0
+			ds.buildErr = ""
+			return m, m.pollBuild(ds.repo, ds.buildRunID, 0) // first poll immediately
 		}
-		// Fire one apply+watch Cmd per change. Each lands as a deployStepMsg.
-		cmds := make([]tea.Cmd, 0, len(ds.changes))
-		for _, c := range ds.changes {
-			cmds = append(cmds, m.runDeployStep(c))
-		}
-		return m, tea.Batch(cmds...)
+		return m.startRollout()
 	}
 	return m, nil
+}
+
+// startRollout records the deploy preset (learning) and fires the confirmed
+// `set image` + rollout-watch per change, moving to the rollout phase. Shared by
+// the immediate path (a ready build) and the await-build path (after the watched
+// run goes green) — recording only happens here, so an aborted build never
+// learns a preset for a deploy that didn't run.
+func (m Model) startRollout() (tea.Model, tea.Cmd) {
+	ds := m.deployModal
+	m.recordDeploy(ds)
+	ds.phase = phaseRollout
+	ds.rollouts = make([]rolloutLine, len(ds.changes))
+	for i, c := range ds.changes {
+		ds.rollouts[i] = rolloutLine{deployment: c.Deployment, state: rolloutRunning}
+	}
+	// Fire one apply+watch Cmd per change. Each lands as a deployStepMsg.
+	cmds := make([]tea.Cmd, 0, len(ds.changes))
+	for _, c := range ds.changes {
+		cmds = append(cmds, m.runDeployStep(c))
+	}
+	return m, tea.Batch(cmds...)
+}
+
+// deployAwaitKey handles the watch-the-build phase. Nothing has deployed yet, so
+// esc cancels the wait and closes; enter dismisses a terminal failure.
+func (m Model) deployAwaitKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	ds := m.deployModal
+	switch {
+	case key.Matches(msg, keys.Cancel):
+		m.deployModal = nil // cancel the wait (or dismiss the failure) — nothing ran
+	case key.Matches(msg, keys.Confirm):
+		if ds.buildStatus == github.BuildFailed {
+			m.deployModal = nil // dismiss the failure
+		}
+	}
+	return m, nil
+}
+
+// onBuildPolled folds one build-status poll into the await phase: green → deploy,
+// failed → abort, still building → schedule the next poll (until the attempt cap,
+// then abort as a timeout). A transient `gh` error keeps the last status and
+// keeps polling. Stale polls (modal closed / different run) are dropped.
+func (m Model) onBuildPolled(msg buildPolledMsg) (tea.Model, tea.Cmd) {
+	ds := m.deployModal
+	if ds == nil || ds.phase != phaseAwaitBuild || ds.buildRunID != msg.runID {
+		return m, nil
+	}
+	ds.buildPolls++
+	if msg.err != nil {
+		ds.buildErr = msg.err.Error() // transient: keep the last status, keep polling
+	} else {
+		ds.buildErr = ""
+		ds.buildStatus = msg.status
+	}
+	switch ds.buildStatus {
+	case github.BuildReady:
+		return m.startRollout() // build green → deploy
+	case github.BuildFailed:
+		ds.buildErr = "the build failed — nothing was deployed"
+		return m, nil // abort; esc/enter closes
+	}
+	if ds.buildPolls >= maxBuildPolls {
+		ds.buildStatus = github.BuildFailed
+		ds.buildErr = "timed out waiting for the build — nothing was deployed"
+		return m, nil
+	}
+	return m, m.pollBuild(ds.repo, ds.buildRunID, buildPollInterval)
 }
 
 func (m Model) deployRolloutKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

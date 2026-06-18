@@ -33,6 +33,10 @@ type Fetchers struct {
 	// version list). limit is how many to return; image is the GHCR image to
 	// probe availability against.
 	Releases func(ctx context.Context, repo git.RepoRef, image string, limit int) []github.ReleaseAnnotation
+	// BuildStatus polls one Actions run's build status by id — the deploy flow's
+	// "wait for the build" step (deploy a still-building version once it's green).
+	// Injected so tests drive it without `gh`.
+	BuildStatus func(ctx context.Context, repo git.RepoRef, runID int64) (github.BuildStatus, error)
 }
 
 // realFetchers binds the data-layer functions to the given kube options.
@@ -55,6 +59,9 @@ func realFetchers(opts k8s.Options) Fetchers {
 		},
 		Releases: func(ctx context.Context, repo git.RepoRef, image string, limit int) []github.ReleaseAnnotation {
 			return github.GetReleases(ctx, repo, github.Options{Limit: limit, GHCRImage: image})
+		},
+		BuildStatus: func(ctx context.Context, repo git.RepoRef, runID int64) (github.BuildStatus, error) {
+			return github.RunStatus(ctx, repo, runID, 0)
 		},
 	}
 }
@@ -125,8 +132,25 @@ type deployStepMsg struct {
 	err        error
 }
 
+// buildPolledMsg carries one poll of the watched build's Actions run (the deploy
+// flow's "wait for the build" step). runID tags it so a stale poll from a
+// cancelled wait — or a different watch — is ignored.
+type buildPolledMsg struct {
+	runID  int64
+	status github.BuildStatus
+	err    error
+}
+
 // tickMsg drives the periodic background refresh.
 type tickMsg time.Time
+
+// buildPollInterval is how often the deploy flow re-checks a still-building
+// release's Actions run. A var so tests can shrink it.
+var buildPollInterval = 8 * time.Second
+
+// maxBuildPolls bounds the total wait (~32 min at 8s) so a wedged or stuck build
+// can't poll forever; exceeding it aborts the deploy (the user can also esc).
+const maxBuildPolls = 240
 
 // fetchTimeout bounds a single background fetch so a wedged kubectl can't hold a
 // tea.Cmd goroutine forever (the data layer also enforces its own per-command
@@ -223,6 +247,23 @@ func (m Model) fetchReleases(repo git.RepoRef, image string, limit, page int) te
 			end = len(all)
 		}
 		return releasesLoadedMsg{page: page, releases: all[start:end]}
+	}
+}
+
+// pollBuild checks the watched build run once (after an optional delay) and lands
+// a buildPolledMsg. The deploy flow re-issues it until the run goes ready (deploy)
+// or failed (abort). Sleeping in the Cmd goroutine is fine — tea runs Cmds
+// concurrently, so it never blocks the UI; the user can esc out of the wait.
+func (m Model) pollBuild(repo git.RepoRef, runID int64, delay time.Duration) tea.Cmd {
+	f := m.deps.Fetch.BuildStatus
+	return func() tea.Msg {
+		if delay > 0 {
+			time.Sleep(delay)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+		defer cancel()
+		st, err := f(ctx, repo, runID)
+		return buildPolledMsg{runID: runID, status: st, err: err}
 	}
 }
 

@@ -53,7 +53,7 @@ func fakeReleases() []github.ReleaseAnnotation {
 	return []github.ReleaseAnnotation{
 		{Tag: "v0.6.10", Name: "v0.6.10", Latest: true, Build: github.BuildReady, ImageAvailable: github.AvailPresent},
 		{Tag: "v0.6.9", Name: "v0.6.9", Build: github.BuildReady, ImageAvailable: github.AvailPresent},
-		{Tag: "v0.7.0-rc.1", Name: "v0.7.0-rc.1", Prerelease: true, Build: github.BuildBuilding, ImageAvailable: github.AvailUnknown},
+		{Tag: "v0.7.0-rc.1", Name: "v0.7.0-rc.1", Prerelease: true, Build: github.BuildBuilding, BuildRunID: 700001, ImageAvailable: github.AvailUnknown},
 		{Tag: "v0.6.8", Name: "v0.6.8", Build: github.BuildReady, ImageAvailable: github.AvailPresent},
 		{Tag: "v0.6.7", Name: "v0.6.7", Build: github.BuildFailed, ImageAvailable: github.AvailAbsent},
 		// 6th+ exist so paging back (`o`) has something to show.
@@ -114,6 +114,11 @@ func deployHarness(t *testing.T) (Deps, *recordingRunner, *store.ActionHistory) 
 			return all[:limit]
 		}
 		return all
+	}
+	// Default build poll: report ready (so a building selection deploys at once).
+	// The await-build tests override this with a scripted sequence.
+	fetch.BuildStatus = func(context.Context, git.RepoRef, int64) (github.BuildStatus, error) {
+		return github.BuildReady, nil
 	}
 
 	ovc := cache.New[k8s.ClusterOverview](cache.Options{BaseDir: base, Namespace: "overview"})
@@ -511,4 +516,102 @@ func TestDeploy_NoMutationBeforeConfirm(t *testing.T) {
 
 	tm.Send(ctrlCMsg())
 	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+}
+
+// scriptedBuild returns the given build statuses in order, repeating the last —
+// drives the deploy await-build poll deterministically (no `gh`).
+type scriptedBuild struct {
+	mu  sync.Mutex
+	seq []github.BuildStatus
+	i   int
+}
+
+func (s *scriptedBuild) next(context.Context, git.RepoRef, int64) (github.BuildStatus, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := s.seq[s.i]
+	if s.i < len(s.seq)-1 {
+		s.i++
+	}
+	return st, nil
+}
+
+// TestDeploy_WaitsForBuildThenDeploysOnGreen: confirming a still-building version
+// watches its Actions run and fires the deploy only once the build goes green.
+func TestDeploy_WaitsForBuildThenDeploysOnGreen(t *testing.T) {
+	deps, runner, _ := deployHarness(t)
+	// Poll quickly, but keep the building window above one render frame (~16ms)
+	// so the "waiting" screen actually flushes before the green poll deploys —
+	// otherwise bubbletea coalesces it and the test can't observe the wait.
+	old := buildPollInterval
+	buildPollInterval = 50 * time.Millisecond
+	defer func() { buildPollInterval = old }()
+	bs := &scriptedBuild{seq: []github.BuildStatus{github.BuildBuilding, github.BuildReady}}
+	deps.Fetch.BuildStatus = bs.next
+
+	tm := openModalOnMailon(t, deps)
+	tm.Send(enterMsg()) // → versions
+	waitFor(t, tm, "v0.7.0-rc.1", "building")
+	tm.Send(runeMsg('j')) // → v0.6.9
+	tm.Send(runeMsg('j')) // → v0.7.0-rc.1 (the building rc)
+	tm.Send(enterMsg())   // → confirm
+	waitFor(t, tm, "confirm", "v0.7.0-rc.1")
+
+	// Nothing has touched kubectl yet (the build hasn't finished).
+	if calls := runner.snapshot(); len(calls) != 0 {
+		t.Fatalf("kubectl invoked before the build finished: %v", calls)
+	}
+
+	tm.Send(enterMsg()) // APPLY → watch the build (first poll: still building)
+	waitFor(t, tm, "waiting for the build")
+	// Build goes green on the next poll → kc deploys automatically.
+	waitFor(t, tm, "rollout", "responder", "done")
+
+	tm.Send(escMsg())
+	tm.Send(runeMsg('q'))
+	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+
+	// `set image` fired with the rc tag — and only AFTER the build went green.
+	var setImage []string
+	for _, c := range runner.snapshot() {
+		if contains2(c, "set") && contains2(c, "image") {
+			setImage = c
+		}
+	}
+	if setImage == nil {
+		t.Fatalf("no `set image` after the build went green; calls=%v", runner.snapshot())
+	}
+	if !contains2(setImage, "deployment/responder") || !strings.Contains(strings.Join(setImage, " "), "v0.7.0-rc.1") {
+		t.Errorf("set image argv = %v, want responder → …:v0.7.0-rc.1", setImage)
+	}
+}
+
+// TestDeploy_AbortsWhenBuildFails: a build that fails while being watched aborts
+// the deploy — nothing is set/rolled out, and esc closes the modal.
+func TestDeploy_AbortsWhenBuildFails(t *testing.T) {
+	deps, runner, _ := deployHarness(t)
+	bs := &scriptedBuild{seq: []github.BuildStatus{github.BuildFailed}}
+	deps.Fetch.BuildStatus = bs.next
+
+	tm := openModalOnMailon(t, deps)
+	tm.Send(enterMsg()) // → versions
+	waitFor(t, tm, "v0.7.0-rc.1")
+	tm.Send(runeMsg('j'))
+	tm.Send(runeMsg('j')) // → the building rc
+	tm.Send(enterMsg())   // → confirm
+	waitFor(t, tm, "confirm")
+	tm.Send(enterMsg()) // APPLY → watch the build (which fails)
+	waitFor(t, tm, "build did not succeed")
+
+	// esc closes; NOTHING was deployed.
+	tm.Send(escMsg())
+	waitFor(t, tm, "DEPLOYMENT", "mailon · [user]")
+	tm.Send(runeMsg('q'))
+	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+
+	for _, c := range runner.snapshot() {
+		if contains2(c, "set") && contains2(c, "image") {
+			t.Fatalf("a failed build must NOT deploy; got set image: %v", c)
+		}
+	}
 }
