@@ -177,15 +177,14 @@ func (m Model) deployPresets(ns string, _ []k8s.Deployment) [][]string {
 	return m.deps.History.DeployPresets(m.deployScope(ns))
 }
 
-// deployScope is the learning scope for deploys in a namespace: cluster × app.
-// The app key is the repo/app name when launched in a repo, else the namespace
-// (so presets are still remembered per namespace without a repo context).
+// deployScope is the learning scope for the set-based ops (deploy / restart /
+// scale) in a namespace: cluster × NAMESPACE. Presets are deployment-SETS and
+// deployment names are namespace-scoped, so the namespace is the right key —
+// keying by the repo/app name (constant across namespaces) bled a set learned in
+// one namespace into the others (e.g. an app deployed to both staging and prod).
+// Search keeps its own cluster-wide scope (searchScope).
 func (m Model) deployScope(ns string) store.Scope {
-	app := m.deps.App
-	if app == "" {
-		app = ns
-	}
-	return store.Scope{Cluster: m.deps.Cluster, App: app}
+	return store.Scope{Cluster: m.deps.Cluster, App: ns}
 }
 
 // ── Key handling (per phase) ─────────────────────────────────────────────────

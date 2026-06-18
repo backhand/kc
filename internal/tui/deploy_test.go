@@ -170,6 +170,30 @@ func TestDeploy_OpensModal(t *testing.T) {
 	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 }
 
+// TestDeploy_PresetsAreNamespaceSpecific guards the scoping fix: a deployment-set
+// learned while operating in one namespace must NOT surface in another, even under
+// the same app/repo context (deployScope keys by namespace, not the repo name).
+func TestDeploy_PresetsAreNamespaceSpecific(t *testing.T) {
+	m := Model{deps: Deps{
+		Cluster: testCluster,
+		App:     "mailon", // a repo context — the old bug ignored ns and keyed on this
+		History: store.New(store.Options{BaseDir: t.TempDir()}),
+	}}
+
+	// Learn a set while operating in namespace "team-a" (any set-based op uses this).
+	m.recordSet("team-a", []string{"api", "worker"})
+
+	// It must NOT leak into a different namespace…
+	if leaked := m.deployPresets("team-b", nil); len(leaked) != 0 {
+		t.Errorf("presets leaked across namespaces: team-b sees %v, want none", leaked)
+	}
+	// …but it DOES surface in its own namespace.
+	own := m.deployPresets("team-a", nil)
+	if len(own) != 1 || !reflect.DeepEqual(own[0], []string{"api", "worker"}) {
+		t.Errorf("team-a presets = %v, want [[api worker]]", own)
+	}
+}
+
 // TestDeploy_PresetContainingCurrentPreChecked seeds a learned preset that
 // CONTAINS the focused deployment and asserts it is pre-checked when the modal
 // opens (SPEC Feature 1: "pre-check the first preset containing the deployment
